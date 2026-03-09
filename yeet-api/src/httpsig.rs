@@ -70,7 +70,7 @@ MC4CAQAwBQYDK2VwBCIEIDx2kNPzVZ7AmTCEY99KU4gw3DoCc9Unq+YCmVLAychJ
     #[tokio::test]
     async fn test_reqwest() {
         let mut signature_params = HttpSignatureParams::try_new(&COMPONENTS).unwrap();
-        let signing_key = SecretKey::from_pem(EDDSA_SECRET_KEY).unwrap();
+        let signing_key = SecretKey::from_pem(&AlgorithmName::Ed25519, EDDSA_SECRET_KEY).unwrap();
         signature_params.set_key_info(&signing_key);
 
         let req = Client::new()

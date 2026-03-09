@@ -26,7 +26,7 @@ impl FromRequestParts<Arc<RwLock<AppState>>> for HttpSig {
     ) -> Result<Self, Self::Rejection> {
         let req = http::Request::from_parts(parts.clone(), String::new());
 
-        let keyids = req.get_key_ids().with_code(StatusCode::BAD_REQUEST)?;
+        let keyids = req.get_alg_key_ids().with_code(StatusCode::BAD_REQUEST)?;
         if keyids.len() != 1 {
             return Err((
                 StatusCode::BAD_REQUEST,
@@ -34,9 +34,23 @@ impl FromRequestParts<Arc<RwLock<AppState>>> for HttpSig {
             ));
         }
 
-        let (_signature, keyid) = keyids
+        let (_signature, (alg, keyid)) = keyids
             .first()
             .expect("This is safe as long as we check the keyid length");
+
+        if *alg != Some(AlgorithmName::Ed25519) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Only Ed25519 is supported at the moment".to_owned(),
+            ));
+        }
+
+        let Some(keyid) = keyid else {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Key signature included but no keyid found".to_owned(),
+            ));
+        };
 
         let Some(verifying_key) = state
             .try_read()
@@ -50,7 +64,7 @@ impl FromRequestParts<Arc<RwLock<AppState>>> for HttpSig {
             ));
         };
 
-        let pub_key = PublicKey::from_bytes(AlgorithmName::Ed25519, verifying_key.as_bytes())
+        let pub_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, verifying_key.as_bytes())
             .with_code(StatusCode::BAD_REQUEST)?;
 
         req.verify_message_signature(&pub_key, Some(keyid))

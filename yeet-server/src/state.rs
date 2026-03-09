@@ -10,7 +10,7 @@ use axum_thiserror::ErrorStatus;
 use ed25519_dalek::VerifyingKey;
 use httpsig_hyper::prelude::{AlgorithmName, PublicKey, VerifyingKey as _};
 use jiff::{ToSpan as _, Zoned};
-use rand::Rng as _;
+use rand::{Rng as _, RngExt as _};
 use serde::{Deserialize, Serialize};
 use serde_json_any_key::any_key_map;
 use thiserror::Error;
@@ -155,7 +155,7 @@ impl AppState {
             .remove(&acceptance.code)
             .ok_or(StateError::AttemptNotFound(acceptance.code))?;
 
-        let signing_key = PublicKey::from_bytes(AlgorithmName::Ed25519, attempt.key.as_bytes())
+        let signing_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, attempt.key.as_bytes())
             .expect("Verifying key already is validated");
 
         self.host_by_key
@@ -307,7 +307,7 @@ impl AppState {
     }
 
     pub fn add_key(&mut self, key: VerifyingKey, level: api::AuthLevel) {
-        let signing_key = PublicKey::from_bytes(AlgorithmName::Ed25519, key.as_bytes())
+        let signing_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, key.as_bytes())
             .expect("Could not convert ED25519 key to httpsig key - wtf");
         if level == api::AuthLevel::Admin {
             self.admin_credentials.insert(key);
@@ -318,7 +318,7 @@ impl AppState {
     }
 
     pub fn remove_key(&mut self, key: &VerifyingKey) {
-        let signing_key = PublicKey::from_bytes(AlgorithmName::Ed25519, key.as_bytes())
+        let signing_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, key.as_bytes())
             .expect("Could not convert ED25519 key to httpsig key - wtf");
         self.admin_credentials.remove(key);
         self.build_machines_credentials.remove(key);
