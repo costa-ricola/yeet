@@ -69,11 +69,6 @@ pub struct RemoteStorePath {
 pub struct VerificationAttempt {
     pub key: VerifyingKey,
     pub store_path: StorePath,
-    pub artifacts: VerificationArtifacts,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq)]
-pub struct VerificationArtifacts {
     pub nixos_facter: Option<String>,
 }
 

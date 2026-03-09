@@ -20,7 +20,9 @@ in
     gcc
     pkg-config
     pkgs-unstable.mdbook
+    sqlx-cli
     # mdbook-mermaid
   ];
   env.RUSTFLAGS = "--cfg tokio_unstable";
+  env.DATABASE_URL = "sqlite:yeet.db";
 }

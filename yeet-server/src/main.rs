@@ -45,6 +45,10 @@ mod routes {
     pub mod verify;
 }
 
+mod db {
+    pub mod keys;
+    pub mod verification;
+}
 #[tokio::main]
 #[expect(
     clippy::expect_used,

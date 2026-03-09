@@ -37,14 +37,6 @@ pub enum StateError {
     #[status(StatusCode::REQUEST_TIMEOUT)]
     TooManyVerificationAttempts,
 
-    #[error("Key already in an verification attempt")]
-    #[status(StatusCode::BAD_REQUEST)]
-    KeyPendingVerification,
-
-    #[error("Provided key is already verified")]
-    #[status(StatusCode::BAD_REQUEST)]
-    KeyAlreadyInUse,
-
     #[error("Verification attempt with code {0} not found")]
     #[status(StatusCode::BAD_REQUEST)]
     AttemptNotFound(u32),
@@ -111,43 +103,12 @@ impl AppState {
         });
     }
 
-    /// Agent want to authenticate so he sends a request
-    /// This can be approved by an admin with `verify_attempt`
-    pub fn add_verification_attempt(&mut self, attempt: api::VerificationAttempt) -> Result<u32> {
-        self.drain_verification_attempts();
-        if self.verification_attempt.len() >= 10 {
-            return Err(StateError::TooManyVerificationAttempts);
-        }
-
-        // check if key already exists
-        if self
-            .verification_attempt
-            .values()
-            .any(|(k, _z)| k.key == attempt.key)
-        {
-            return Err(StateError::KeyPendingVerification);
-        }
-
-        // check if key already is in registered keys
-        if self.keyids.values().any(|key| key == &attempt.key) {
-            return Err(StateError::KeyAlreadyInUse);
-        }
-
-        // attempt is safe to add -> create a random number
-        let verification = rand::rng().random_range(100_000..=999_999);
-
-        self.verification_attempt
-            .insert(verification, (attempt, Zoned::now()));
-
-        Ok(verification)
-    }
-
     /// Verify an existing verification attempt
     /// Host needs to be pre-register
     pub fn verify_attempt(
         &mut self,
         acceptance: api::VerificationAcceptance,
-    ) -> Result<api::VerificationArtifacts> {
+    ) -> Result<Option<String>> {
         self.drain_verification_attempts();
 
         let (attempt, first_ping) = self
@@ -171,7 +132,7 @@ impl AppState {
             },
         );
         self.keyids.insert(signing_key.key_id(), attempt.key);
-        Ok(attempt.artifacts)
+        Ok(attempt.nixos_facter)
     }
 
     /// This is the "ping" command every client should send in a specific interval.
