@@ -5604,6 +5604,7 @@ dependencies = [
  "axum_thiserror",
  "curve25519-dalek",
  "ed25519-dalek",
+ "futures",
  "httpsig-hyper",
  "jiff",
  "jiff-sqlx",

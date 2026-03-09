@@ -1,6 +1,7 @@
 use axum::http::StatusCode;
 use ed25519_dalek::VerifyingKey;
 use jiff_sqlx::ToSqlx;
+use serde::Deserialize;
 
 #[derive(thiserror::Error, Debug, axum_thiserror::ErrorStatus)]
 pub enum KeyError {
@@ -10,6 +11,9 @@ pub enum KeyError {
 }
 type Result<T> = core::result::Result<T, KeyError>;
 
+#[derive(Clone, Copy, Debug, sqlx::Type, Deserialize)]
+#[sqlx(transparent)]
+pub struct HostID(pub(super) i64);
 pub async fn host_by_key(
     conn: &mut sqlx::SqliteConnection,
     key: VerifyingKey,
@@ -28,10 +32,10 @@ pub async fn add_host(
     keyid: String,
     key: VerifyingKey,
     hostname: String,
-) -> Result<()> {
+) -> Result<HostID> {
     let now = jiff::Timestamp::now().to_sqlx();
     let key = &key.as_bytes()[..];
-    sqlx::query!(
+    let host = sqlx::query!(
         r#"
         INSERT INTO hosts (keyid, verifying_key, hostname, last_ping)
         VALUES ($1, $2, $3, $4)"#,
@@ -42,5 +46,12 @@ pub async fn add_host(
     )
     .execute(conn)
     .await?;
+    Ok(HostID(host.last_insert_rowid()))
+}
+
+pub async fn remove_host(conn: &mut sqlx::SqliteConnection, host: HostID) -> Result<()> {
+    sqlx::query!(r#"DELETE FROM hosts WHERE id = $1"#, host)
+        .execute(conn)
+        .await?;
     Ok(())
 }

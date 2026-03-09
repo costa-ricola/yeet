@@ -32,7 +32,7 @@ pub async fn add_verification_attempt(
     }
 
     // check if key already is in registered keys
-    if db::keys::host_by_key(conn, key).await?.is_some() {
+    if db::hosts::host_by_key(conn, key).await?.is_some() {
         return Err(VerificationError::KeyAlreadyInUse);
     }
 
@@ -91,7 +91,7 @@ pub async fn approve_attempt(
     let httpsig_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, key.as_bytes())
         .expect("Verifying key already is validated");
 
-    db::keys::add_host(conn, httpsig_key.key_id(), key, hostname).await?;
+    db::hosts::add_host(conn, httpsig_key.key_id(), key, hostname).await?;
 
     Ok(approved.nixos_facter)
 }
@@ -147,7 +147,7 @@ pub enum VerificationError {
 
     #[error(transparent)]
     #[status(StatusCode::INTERNAL_SERVER_ERROR)]
-    KeysError(#[from] db::keys::KeyError),
+    KeysError(#[from] db::hosts::KeyError),
 
     #[error(transparent)]
     #[status(StatusCode::INTERNAL_SERVER_ERROR)]
@@ -205,7 +205,7 @@ mod test_verification {
             .await
             .unwrap();
 
-        db::keys::add_host(
+        db::hosts::add_host(
             &mut conn,
             "keyid".to_owned(),
             VerifyingKey::default(),

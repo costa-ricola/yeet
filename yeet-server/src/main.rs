@@ -32,7 +32,6 @@ use crate::{
 
 mod error;
 mod httpsig;
-mod secret_store;
 mod state;
 mod routes {
     pub mod detach;
@@ -46,7 +45,8 @@ mod routes {
 }
 
 mod db {
-    pub mod keys;
+    pub mod hosts;
+    pub mod secrets;
     pub mod verification;
 }
 #[tokio::main]
@@ -110,10 +110,10 @@ fn routes(state: Arc<RwLock<AppState>>) -> Router {
         .route("/secret/rename", post(secret::rename_secret))
         .route("/secret/remove", post(secret::remove_secret))
         .route("/secret/acl", post(secret::set_acl))
-        .route("/secret/acl/all", get(secret::get_all_acl))
-        .route("/secret/list", get(secret::list))
+        // .route("/secret/acl/all", get(secret::get_all_acl))
+        // .route("/secret/list", get(secret::list))
         .route("/secret/server_key", get(secret::get_server_recipient))
-        .route("/secret", post(secret::get_secret))
+        // .route("/secret", post(secret::get_secret))
         .with_state(state)
 }
 

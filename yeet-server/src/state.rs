@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json_any_key::any_key_map;
 use thiserror::Error;
 
-use crate::secret_store::{SecretStore, SecretStoreError};
+// use crate::db::secret::{SecretError, SecretStore};
 
 #[derive(Error, Debug, ErrorStatus)]
 pub enum StateError {
@@ -31,16 +31,6 @@ pub enum StateError {
     #[status(StatusCode::FORBIDDEN)]
     AuthMissingBuild,
 
-    #[error(
-        "There are too many open verification attempts - limit the visibility of the server to the network"
-    )]
-    #[status(StatusCode::REQUEST_TIMEOUT)]
-    TooManyVerificationAttempts,
-
-    #[error("Verification attempt with code {0} not found")]
-    #[status(StatusCode::BAD_REQUEST)]
-    AttemptNotFound(u32),
-
     #[error("You have no permission to detach your host")]
     #[status(StatusCode::FORBIDDEN)]
     DetachNotAllowed,
@@ -52,10 +42,6 @@ pub enum StateError {
     #[error("The provided recipient key is invalid")]
     #[status(StatusCode::BAD_REQUEST)]
     RecipientKeyError(&'static str),
-
-    #[error("Error while accessing the secret store")]
-    #[status(StatusCode::INTERNAL_SERVER_ERROR)]
-    SecretStoreError(#[from] SecretStoreError),
 }
 
 type Result<T> = core::result::Result<T, StateError>;
@@ -78,8 +64,8 @@ pub struct AppState {
     // Should hosts be allowed to detach by themself in general
     detach_allowed: bool,
     // Secrets encrypted with `server_key`
-    #[serde(default)]
-    secrets: SecretStore,
+    // #[serde(default)]
+    // secrets: SecretStore,
     // Server key used for response signatures (TODO), certificate pinning (TODO) and for secret decryption
     #[serde(default = "create_age_identity")]
     age_identity: String,
@@ -265,7 +251,7 @@ impl AppState {
 
         self.purge_keyids();
 
-        self.secrets.remove_host(hostname);
+        // self.secrets.remove_host(hostname);
 
         Ok(host)
     }
@@ -294,7 +280,7 @@ impl AppState {
         {
             hostname.clone_from(&new_name);
         }
-        self.secrets.rename_host(old_name.clone(), new_name);
+        // self.secrets.rename_host(old_name.clone(), new_name);
 
         Ok(())
     }
@@ -386,58 +372,58 @@ impl AppState {
         self.keyids.get(keyid.as_ref()).copied()
     }
 
-    pub fn add_secret<S: Into<String>, V: Into<Vec<u8>>>(
-        &mut self,
-        name: S,
-        secret: V,
-    ) -> Result<()> {
-        let store_key = age::x25519::Identity::from_str(&self.age_identity)
-            .map_err(StateError::StoreKeyDecryptionError)?;
-        self.secrets.add_secret(name, secret, &store_key)?;
-        Ok(())
-    }
+    // pub fn add_secret<S: Into<String>, V: Into<Vec<u8>>>(
+    //     &mut self,
+    //     name: S,
+    //     secret: V,
+    // ) -> Result<()> {
+    //     let store_key = age::x25519::Identity::from_str(&self.age_identity)
+    //         .map_err(StateError::StoreKeyDecryptionError)?;
+    //     self.secrets.add_secret(name, secret, &store_key)?;
+    //     Ok(())
+    // }
 
-    pub fn rename_secret<S: Into<String>>(&mut self, current_name: S, new_name: S) {
-        self.secrets.rename_secret(current_name, new_name);
-    }
-    pub fn remove_secret<S: Into<String>>(&mut self, secret_name: S) {
-        self.secrets.remove_secret(secret_name);
-    }
+    // pub fn rename_secret<S: Into<String>>(&mut self, current_name: S, new_name: S) {
+    //     self.secrets.rename_secret(current_name, new_name);
+    // }
+    // pub fn remove_secret<S: Into<String>>(&mut self, secret_name: S) {
+    //     self.secrets.remove_secret(secret_name);
+    // }
 
-    pub fn secret_add_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
-        self.secrets.add_access_for(secret, host);
-    }
-    pub fn secret_remove_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
-        self.secrets.remove_access_for(secret, host);
-    }
-    pub fn get_all_acl(&self) -> HashMap<String, Vec<String>> {
-        self.secrets.get_all_acl()
-    }
-    pub fn list_secrets(&self) -> Vec<String> {
-        self.secrets.list_secrets()
-    }
+    // pub fn secret_add_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
+    //     self.secrets.add_access_for(secret, host);
+    // }
+    // pub fn secret_remove_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
+    //     self.secrets.remove_access_for(secret, host);
+    // }
+    // pub fn get_all_acl(&self) -> HashMap<String, Vec<String>> {
+    //     self.secrets.get_all_acl()
+    // }
+    // pub fn list_secrets(&self) -> Vec<String> {
+    //     self.secrets.list_secrets()
+    // }
     pub fn get_server_recipient(&self) -> Result<String> {
         Ok(age::x25519::Identity::from_str(&self.age_identity)
             .map_err(StateError::StoreKeyDecryptionError)?
             .to_public()
             .to_string())
     }
-    pub fn get_secret(
-        &self,
-        secret: String,
-        recipient: String,
-        key: &VerifyingKey,
-    ) -> Result<Option<Vec<u8>>> {
-        let store_key = age::x25519::Identity::from_str(&self.age_identity)
-            .map_err(StateError::StoreKeyDecryptionError)?;
+    // pub fn get_secret(
+    //     &self,
+    //     secret: String,
+    //     recipient: String,
+    //     key: &VerifyingKey,
+    // ) -> Result<Option<Vec<u8>>> {
+    //     let store_key = age::x25519::Identity::from_str(&self.age_identity)
+    //         .map_err(StateError::StoreKeyDecryptionError)?;
 
-        let recipient =
-            age::x25519::Recipient::from_str(&recipient).map_err(StateError::RecipientKeyError)?;
+    //     let recipient =
+    //         age::x25519::Recipient::from_str(&recipient).map_err(StateError::RecipientKeyError)?;
 
-        let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
+    //     let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
 
-        Ok(self
-            .secrets
-            .get_secret_for(&secret, &store_key, hostname, &recipient)?)
-    }
+    //     Ok(self
+    //         .secrets
+    //         .get_secret_for(&secret, &store_key, hostname, &recipient)?)
+    // }
 }
