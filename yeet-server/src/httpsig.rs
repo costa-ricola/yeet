@@ -11,16 +11,16 @@ use httpsig_hyper::{
 
 use serde::de::DeserializeOwned;
 
-use crate::{db, error::WithStatusCode as _};
+use crate::{YeetState, db, error::WithStatusCode as _};
 
 pub struct HttpSig(pub VerifyingKey);
 
-impl FromRequestParts<sqlx::SqlitePool> for HttpSig {
+impl FromRequestParts<YeetState> for HttpSig {
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(
         parts: &mut axum::http::request::Parts,
-        pool: &sqlx::SqlitePool,
+        state: &YeetState,
     ) -> Result<Self, Self::Rejection> {
         #[cfg(test)]
         return Ok(HttpSig(VerifyingKey::default()));
@@ -54,7 +54,8 @@ impl FromRequestParts<sqlx::SqlitePool> for HttpSig {
         };
         // TODO maybe acquire a connection only once instead of here and in the handler
 
-        let mut conn = pool
+        let mut conn = state
+            .pool
             .acquire()
             .await
             .with_code(StatusCode::INTERNAL_SERVER_ERROR)?;

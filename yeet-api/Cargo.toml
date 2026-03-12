@@ -12,8 +12,13 @@ description = "Pull-based NixOs deployment server+agent"
 [lints]
 workspace = true
 
+[features]
+hazard = ["dep:sqlx"]
+
 [dependencies]
 ahash = { version = "0.8.12", features = ["std"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"], optional = true }
+
 
 reqwest.workspace = true
 httpsig-hyper.workspace = true

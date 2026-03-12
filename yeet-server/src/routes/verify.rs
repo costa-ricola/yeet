@@ -15,7 +15,8 @@ use axum::{
 };
 
 use crate::{
-    db,
+    YeetState, db,
+    error::{BadRequest, InternalError as _},
     httpsig::{HttpSig, VerifiedJson},
 };
 
@@ -26,32 +27,37 @@ pub async fn is_host_verified(HttpSig(_http_key): HttpSig) -> StatusCode {
 
 /// Adds a new key as an verification attempt
 pub async fn add_verification_attempt(
-    State(pool): State<sqlx::SqlitePool>,
+    State(state): State<YeetState>,
     Json(attempt): Json<api::verify::VerificationAttempt>,
-) -> Result<Json<i64>, db::verification::VerificationError> {
+) -> Result<Json<i64>, (StatusCode, String)> {
     // TODO: check if httsig is correct so that non key owners can not send verification attempts
     // Altough this is not a security risk because even if you create an foreign attempt still only the key holder get authorized
-    let mut conn = pool.acquire().await?;
+    let mut conn = state.pool.acquire().await.internal_server()?;
 
     let code =
         db::verification::add_verification_attempt(&mut conn, attempt.key, attempt.nixos_facter)
-            .await?;
+            .await
+            .bad_request()?;
 
     Ok(Json(code))
 }
 
 /// Accept an verification attempt
 pub async fn accept_attempt(
-    State(pool): State<sqlx::SqlitePool>,
+    State(state): State<YeetState>,
     HttpSig(_key): HttpSig,
     Path(id): Path<u32>,
     VerifiedJson(hostname): VerifiedJson<String>,
-) -> Result<Json<Option<String>>, db::verification::VerificationError> {
+) -> Result<Json<Option<String>>, (StatusCode, String)> {
     // todo admin auth
 
-    let mut conn = pool.acquire().await?;
+    let mut conn = state.pool.acquire().await.internal_server()?;
 
-    let facter = db::verification::accept_attempt(&mut conn, id as i64, hostname).await?;
+    // TODO: return Bad request if key does not exist
+    let facter = db::verification::accept_attempt(&mut conn, id as i64, hostname)
+        .await
+        .bad_request()?;
+
     Ok(Json(facter))
 }
 
@@ -87,7 +93,7 @@ mod test_verification {
 
         assert_eq!(facter, Some("hi".to_owned()));
 
-        let host = db::hosts::host_by_verify_key(&mut conn, VerifyingKey::default())
+        let host = db::hosts::hostname_by_verify_key(&mut conn, VerifyingKey::default())
             .await
             .unwrap();
 

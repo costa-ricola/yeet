@@ -1,10 +1,23 @@
-use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use ed25519_dalek::VerifyingKey;
 use httpsig_hyper::prelude::{AlgorithmName, PublicKey, VerifyingKey as _};
 use jiff_sqlx::ToSqlx as _;
 use rand::RngExt as _;
 
 use crate::db;
+
+error_set::error_set! {
+    AddVerificationError := {
+        #[display("Key already in an verification attempt")]
+        KeyPendingVerification,
+        #[display("Provided key is already verified")]
+        KeyAlreadyInUse,
+        #[display("Too many attempts. Try again later")]
+        TooManyAttempts,
+
+        SQLXError(sqlx::Error),
+    }
+}
 
 /// Add a new verification attempt from an unknown host (Agent)
 /// This can be approved by an admin with `approve_attempt`
@@ -22,23 +35,26 @@ pub async fn add_verification_attempt(
     conn: &mut sqlx::SqliteConnection,
     key: VerifyingKey,
     nixos_facter: Option<String>,
-) -> Result<i64> {
+) -> Result<i64, AddVerificationError> {
     // delete old attemps to give room for new ones
     delete_old_attempts(conn).await?;
 
     // If the client has an attempt already we abort
     if key_exists(conn, key).await? {
-        return Err(VerificationError::KeyPendingVerification);
+        return Err(AddVerificationError::KeyPendingVerification);
     }
 
     // check if key already is in registered keys
-    if db::hosts::host_by_verify_key(conn, key).await?.is_some() {
-        return Err(VerificationError::KeyAlreadyInUse);
+    if db::hosts::hostname_by_verify_key(conn, key)
+        .await?
+        .is_some()
+    {
+        return Err(AddVerificationError::KeyAlreadyInUse);
     }
 
     // limit concurrent attempts
     if count_attempts(conn).await? >= 10 {
-        return Err(VerificationError::TooManyAttempts);
+        return Err(AddVerificationError::TooManyAttempts);
     }
 
     let id = rand::rng().random_range(100_000..=999_999);
@@ -70,10 +86,11 @@ pub async fn accept_attempt(
     conn: &mut sqlx::SqliteConnection,
     code: i64,
     hostname: String,
-) -> Result<Option<String>> {
+) -> Result<Option<String>, sqlx::Error> {
     // delete old attemps to give room for new ones
     delete_old_attempts(conn).await?;
 
+    // TODO: what happens if you approve a key that does not exist
     let approved = sqlx::query!(
         r#"DELETE FROM verification_attempts WHERE id = $1 RETURNING nixos_facter,verifying_key"#,
         code,
@@ -96,7 +113,7 @@ pub async fn accept_attempt(
     Ok(approved.nixos_facter)
 }
 
-async fn count_attempts(conn: &mut sqlx::SqliteConnection) -> Result<i64> {
+async fn count_attempts(conn: &mut sqlx::SqliteConnection) -> Result<i64, sqlx::Error> {
     Ok(
         sqlx::query_scalar!(r#"SELECT COUNT(*) FROM verification_attempts"#)
             .fetch_one(conn)
@@ -104,7 +121,10 @@ async fn count_attempts(conn: &mut sqlx::SqliteConnection) -> Result<i64> {
     )
 }
 
-async fn key_exists(conn: &mut sqlx::SqliteConnection, key: VerifyingKey) -> Result<bool> {
+async fn key_exists(
+    conn: &mut sqlx::SqliteConnection,
+    key: VerifyingKey,
+) -> Result<bool, sqlx::Error> {
     let key = &key.as_bytes()[..];
     Ok(sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM verification_attempts WHERE verifying_key = $1) AS 'exists!: bool'"#,
@@ -114,7 +134,7 @@ async fn key_exists(conn: &mut sqlx::SqliteConnection, key: VerifyingKey) -> Res
     .await?)
 }
 
-async fn delete_old_attempts(conn: &mut sqlx::SqliteConnection) -> Result<u64> {
+async fn delete_old_attempts(conn: &mut sqlx::SqliteConnection) -> Result<u64, sqlx::Error> {
     // threshold: 2min
     let cutoff = (jiff::Timestamp::now() - jiff::Span::new().minutes(2)).to_sqlx();
 
@@ -129,31 +149,6 @@ async fn delete_old_attempts(conn: &mut sqlx::SqliteConnection) -> Result<u64> {
     Ok(result.rows_affected())
 }
 
-type Result<T> = core::result::Result<T, VerificationError>;
-
-#[derive(thiserror::Error, Debug, axum_thiserror::ErrorStatus)]
-pub enum VerificationError {
-    #[error("Key already in an verification attempt")]
-    #[status(StatusCode::BAD_REQUEST)]
-    KeyPendingVerification,
-
-    #[error("Provided key is already verified")]
-    #[status(StatusCode::BAD_REQUEST)]
-    KeyAlreadyInUse,
-
-    #[error("Too many attempts. Try again later")]
-    #[status(StatusCode::BAD_REQUEST)]
-    TooManyAttempts,
-
-    #[error(transparent)]
-    #[status(StatusCode::INTERNAL_SERVER_ERROR)]
-    HostError(#[from] db::hosts::HostError),
-
-    #[error(transparent)]
-    #[status(StatusCode::INTERNAL_SERVER_ERROR)]
-    SQLXError(#[from] sqlx::Error),
-}
-
 #[cfg(test)]
 mod test_verification {
 
@@ -161,15 +156,11 @@ mod test_verification {
     use jiff_sqlx::ToSqlx as _;
     use rand::RngExt as _;
 
-    use crate::db::{self, verification::VerificationError};
+    use crate::db::{self, verification::AddVerificationError};
 
     #[sqlx::test]
     async fn add_verification(pool: sqlx::SqlitePool) {
-        let mut conn = pool.acquire().await.unwrap();
-        sqlx::migrate!("../migrations")
-            .run(&mut conn)
-            .await
-            .unwrap();
+        let mut conn = crate::sql_conn(pool).await;
 
         db::verification::add_verification_attempt(&mut conn, VerifyingKey::default(), None)
             .await
@@ -177,12 +168,30 @@ mod test_verification {
     }
 
     #[sqlx::test]
-    async fn key_already_requestd(pool: sqlx::SqlitePool) {
-        let mut conn = pool.acquire().await.unwrap();
-        sqlx::migrate!("../migrations")
-            .run(&mut conn)
+    async fn add_verification_and_accept(pool: sqlx::SqlitePool) {
+        let mut conn = crate::sql_conn(pool).await;
+
+        let code =
+            db::verification::add_verification_attempt(&mut conn, VerifyingKey::default(), None)
+                .await
+                .unwrap();
+
+        db::verification::accept_attempt(&mut conn, code, "somehost".to_owned())
             .await
             .unwrap();
+    }
+
+    #[sqlx::test]
+    async fn accept_nonexistent(pool: sqlx::SqlitePool) {
+        let mut conn = crate::sql_conn(pool).await;
+
+        let err = db::verification::accept_attempt(&mut conn, 0, "somehost".to_owned()).await;
+        assert!(err.is_err())
+    }
+
+    #[sqlx::test]
+    async fn key_already_requestd(pool: sqlx::SqlitePool) {
+        let mut conn = crate::sql_conn(pool).await;
 
         db::verification::add_verification_attempt(&mut conn, VerifyingKey::default(), None)
             .await
@@ -192,18 +201,14 @@ mod test_verification {
             db::verification::add_verification_attempt(&mut conn, VerifyingKey::default(), None)
                 .await;
         match err {
-            Err(VerificationError::KeyPendingVerification) => {}
+            Err(AddVerificationError::KeyPendingVerification) => {}
             _ => panic!(),
         }
     }
 
     #[sqlx::test]
     async fn key_already_in_use(pool: sqlx::SqlitePool) {
-        let mut conn = pool.acquire().await.unwrap();
-        sqlx::migrate!("../migrations")
-            .run(&mut conn)
-            .await
-            .unwrap();
+        let mut conn = crate::sql_conn(pool).await;
 
         db::hosts::add_host(
             &mut conn,
@@ -219,18 +224,14 @@ mod test_verification {
                 .await;
 
         match err {
-            Err(VerificationError::KeyAlreadyInUse) => {}
+            Err(AddVerificationError::KeyAlreadyInUse) => {}
             _ => panic!(),
         }
     }
 
     #[sqlx::test]
     async fn no_more_than_10(pool: sqlx::SqlitePool) {
-        let mut conn = pool.acquire().await.unwrap();
-        sqlx::migrate!("../migrations")
-            .run(&mut conn)
-            .await
-            .unwrap();
+        let mut conn = crate::sql_conn(pool).await;
 
         for _ in 0..10 {
             db::verification::add_verification_attempt(
@@ -247,18 +248,14 @@ mod test_verification {
                 .await;
 
         match err {
-            Err(VerificationError::TooManyAttempts) => {}
+            Err(AddVerificationError::TooManyAttempts) => {}
             _ => panic!(),
         }
     }
 
     #[sqlx::test]
     async fn delete_old_attempts(pool: sqlx::SqlitePool) {
-        let mut conn = pool.acquire().await.unwrap();
-        sqlx::migrate!("../migrations")
-            .run(&mut conn)
-            .await
-            .unwrap();
+        let mut conn = crate::sql_conn(pool).await;
 
         let id = rand::rng().random_range(100_000..=999_999);
 

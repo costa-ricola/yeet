@@ -1319,6 +1319,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "error_set"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "769f9f87d305e0d64bcb6a8459021e9be27e145c14b8287abcc328954f92e552"
+dependencies = [
+ "error_set_impl",
+]
+
+[[package]]
+name = "error_set_impl"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31799fcd4d4ee7ad6af27ca9ec307733d57cce0e137e38dec7e196b2ae75dd2c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
 name = "etcetera"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5819,6 +5840,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json_any_key",
+ "sqlx",
  "ssh-key",
  "thiserror 2.0.18",
  "tokio",
@@ -5834,6 +5856,7 @@ dependencies = [
  "axum_thiserror",
  "curve25519-dalek",
  "ed25519-dalek",
+ "error_set",
  "futures",
  "httpsig-hyper",
  "jiff",

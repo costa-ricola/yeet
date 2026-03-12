@@ -11,33 +11,19 @@
 //! because an attack would need to also obtain the identity key of a hosts that
 //! has access to the secrets
 
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
-use axum::http::StatusCode;
 use futures::TryStreamExt as _;
 
-use crate::db::{self, hosts::HostID};
+use crate::db::{self};
 
-#[derive(thiserror::Error, Debug, axum_thiserror::ErrorStatus)]
-pub enum SecretError {
-    #[error("Could not decrypt the secret with the provided Identity")]
-    #[status(StatusCode::INTERNAL_SERVER_ERROR)]
-    DecryptionError(#[from] age::DecryptError),
-
-    #[error("Could not encryot the secret with the provided Recipient")]
-    #[status(StatusCode::INTERNAL_SERVER_ERROR)]
-    EncryptError(#[from] age::EncryptError),
-
-    #[error(transparent)]
-    #[status(StatusCode::INTERNAL_SERVER_ERROR)]
-    SQLXError(#[from] sqlx::Error),
+error_set::error_set! {
+    AddSecretError := {
+        #[display("Secret is not encrytped")]
+        UnencryptedSecretError(age::DecryptError),
+        SQLXError(sqlx::Error),
+    }
 }
-
-type Result<T> = core::result::Result<T, SecretError>;
-
-#[derive(Clone, Copy, Debug, sqlx::Type, Hash, PartialEq, Eq)]
-#[sqlx(transparent)]
-pub struct SecretID(i64);
 
 /// Add a new secret - `store_key` required to test if it is an actual encrypted secret and not bogus
 pub async fn add_secret<I: age::Identity, S: Into<String>, V: Into<Vec<u8>>>(
@@ -45,7 +31,7 @@ pub async fn add_secret<I: age::Identity, S: Into<String>, V: Into<Vec<u8>>>(
     name: S,
     secret: V,
     store_key: &I,
-) -> Result<SecretID> {
+) -> Result<api::SecretID, AddSecretError> {
     let secret = secret.into();
     let name = name.into();
     // test if secret is decryptable
@@ -57,7 +43,16 @@ pub async fn add_secret<I: age::Identity, S: Into<String>, V: Into<Vec<u8>>>(
     )
     .execute(conn)
     .await?;
-    Ok(SecretID(row.last_insert_rowid()))
+    Ok(api::SecretID::new(row.last_insert_rowid()))
+}
+
+error_set::error_set! {
+    GetSecretError := {
+        #[display("Could not encrypt the secret for the target: {0}")]
+        EncryptError(age::EncryptError),
+        DecryptError(age::DecryptError),
+        SQLXError(sqlx::Error),
+    }
 }
 
 /// Security: the caller is responsible to make sure that `recipient` equals `host`
@@ -68,18 +63,30 @@ pub async fn add_secret<I: age::Identity, S: Into<String>, V: Into<Vec<u8>>>(
 /// Returns `Ok(None)` if the host is not allowed to access the secret or if the secret does not exist
 pub async fn get_secret_for<R: age::Recipient, I: age::Identity>(
     conn: &mut sqlx::SqliteConnection,
-    secret: SecretID,
+    secret: &str,
     store_key: &I,
-    host: db::hosts::HostID,
+    host: api::HostID,
     recipient: &R,
-) -> Result<Option<Vec<u8>>> {
+) -> Result<Option<Vec<u8>>, GetSecretError> {
+    // TODO transaction so that no TOCTOU can occur
+
+    let Some(secret) = sqlx::query_scalar!(
+        r#"SELECT id as "id: api::SecretID" FROM secrets WHERE name = $1"#,
+        secret
+    )
+    .fetch_optional(&mut *conn)
+    .await?
+    else {
+        return Ok(None);
+    };
+
     // return if the host has no access
     if !check_acl(conn, secret, host).await? {
         return Ok(None);
     }
 
     // since we checked the acl this means that the secret has to exist
-    let secret = sqlx::query_scalar!(r#"SELECT secret from secrets WHERE id = $1"#, secret)
+    let secret = sqlx::query_scalar!(r#"SELECT secret FROM secrets WHERE id = $1"#, secret)
         .fetch_one(conn)
         .await?;
 
@@ -89,9 +96,9 @@ pub async fn get_secret_for<R: age::Recipient, I: age::Identity>(
 
 async fn check_acl(
     conn: &mut sqlx::SqliteConnection,
-    secret: SecretID,
-    host: db::hosts::HostID,
-) -> Result<bool> {
+    secret: api::SecretID,
+    host: api::HostID,
+) -> Result<bool, sqlx::Error> {
     Ok(sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM secrets_acl WHERE secret_id = $1 AND host_id = $2) AS 'exists!: bool'"#,
         secret,
@@ -105,9 +112,9 @@ async fn check_acl(
 /// Can fail if the secret or host do not exist
 pub async fn add_access_for(
     conn: &mut sqlx::SqliteConnection,
-    secret: SecretID,
-    host: db::hosts::HostID,
-) -> Result<()> {
+    secret: api::SecretID,
+    host: api::HostID,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"INSERT INTO secrets_acl (secret_id, host_id) VALUES ($1,$2)"#,
         secret,
@@ -121,9 +128,9 @@ pub async fn add_access_for(
 /// Removes the specified host to the acl of a secret
 pub async fn remove_access_for(
     conn: &mut sqlx::SqliteConnection,
-    secret: SecretID,
-    host: db::hosts::HostID,
-) -> Result<()> {
+    secret: api::SecretID,
+    host: api::HostID,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"DELETE FROM secrets_acl WHERE secret_id = $1 AND host_id = $2"#,
         secret,
@@ -135,7 +142,10 @@ pub async fn remove_access_for(
 }
 
 /// Removes the specified host to the acl of a secret
-pub async fn remove_secret(conn: &mut sqlx::SqliteConnection, secret: SecretID) -> Result<()> {
+pub async fn remove_secret(
+    conn: &mut sqlx::SqliteConnection,
+    secret: api::SecretID,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(r#"DELETE FROM secrets WHERE id = $1"#, secret)
         .execute(conn)
         .await?;
@@ -144,15 +154,15 @@ pub async fn remove_secret(conn: &mut sqlx::SqliteConnection, secret: SecretID) 
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Secret {
-    id: SecretID,
+    id: api::SecretID,
     name: String,
 }
 
 /// list secrets
-pub async fn list_secrets(conn: &mut sqlx::SqliteConnection) -> Result<Vec<Secret>> {
+pub async fn list_secrets(conn: &mut sqlx::SqliteConnection) -> Result<Vec<Secret>, sqlx::Error> {
     let secrets = sqlx::query!(r#"SELECT id, name FROM secrets"#)
         .map(|r| Secret {
-            id: SecretID(r.id),
+            id: api::SecretID::new(r.id),
             name: r.name,
         })
         .fetch_all(conn)
@@ -162,10 +172,12 @@ pub async fn list_secrets(conn: &mut sqlx::SqliteConnection) -> Result<Vec<Secre
 }
 
 /// list acl
-pub async fn list_acl(conn: &mut sqlx::SqliteConnection) -> Result<HashMap<SecretID, HostID>> {
+pub async fn list_acl(
+    conn: &mut sqlx::SqliteConnection,
+) -> Result<HashMap<api::SecretID, api::HostID>, sqlx::Error> {
     let secrets = sqlx::query!(r#"SELECT secret_id, host_id FROM secrets_acl"#)
         .fetch(conn)
-        .map_ok(|r| (SecretID(r.secret_id), HostID(r.host_id)))
+        .map_ok(|r| (api::SecretID::new(r.secret_id), api::HostID::new(r.host_id)))
         .try_collect::<HashMap<_, _>>()
         .await?;
 
@@ -175,9 +187,9 @@ pub async fn list_acl(conn: &mut sqlx::SqliteConnection) -> Result<HashMap<Secre
 /// Rename a secret including its acl
 pub async fn rename_secret(
     conn: &mut sqlx::SqliteConnection,
-    id: SecretID,
+    id: api::SecretID,
     new: String,
-) -> Result<()> {
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         UPDATE secrets
@@ -196,7 +208,7 @@ mod test {
 
     use ed25519_dalek::{SigningKey, VerifyingKey};
 
-    use crate::db::{self, hosts::HostID, secrets::Secret};
+    use crate::db::{self, secrets::Secret};
 
     #[sqlx::test]
     async fn create_and_retrieve_secret(pool: sqlx::SqlitePool) {
@@ -229,7 +241,7 @@ mod test {
 
         let encrypted_for_host = db::secrets::get_secret_for(
             &mut conn,
-            my_secret,
+            "my_secret",
             &store_key,
             my_host,
             &host.to_public(),
@@ -255,15 +267,15 @@ mod test {
 
         let encrypted = age::encrypt(&store_key.to_public(), b"secret_text").unwrap();
 
-        let my_secret = db::secrets::add_secret(&mut conn, "my_secret", encrypted, &store_key)
+        let _my_secret = db::secrets::add_secret(&mut conn, "my_secret", encrypted, &store_key)
             .await
             .unwrap();
 
         let secret = db::secrets::get_secret_for(
             &mut conn,
-            my_secret,
+            "my_secret",
             &store_key,
-            HostID(1),
+            api::HostID::new(1),
             &host.to_public(),
         )
         .await
@@ -301,20 +313,30 @@ mod test {
             .await
             .unwrap();
 
-        let _: Vec<u8> =
-            db::secrets::get_secret_for(&mut conn, secret, &store_key, my_host, &host.to_public())
-                .await
-                .unwrap()
-                .unwrap();
+        let _: Vec<u8> = db::secrets::get_secret_for(
+            &mut conn,
+            "my_secret",
+            &store_key,
+            my_host,
+            &host.to_public(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
 
         db::secrets::remove_access_for(&mut conn, secret, my_host)
             .await
             .unwrap();
 
-        let secret =
-            db::secrets::get_secret_for(&mut conn, secret, &store_key, my_host, &host.to_public())
-                .await
-                .unwrap();
+        let secret = db::secrets::get_secret_for(
+            &mut conn,
+            "my_secret",
+            &store_key,
+            my_host,
+            &host.to_public(),
+        )
+        .await
+        .unwrap();
 
         assert!(secret.is_none());
     }

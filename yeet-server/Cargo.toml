@@ -17,7 +17,7 @@ workspace = true
 axum = {version = "0.8", features = ["macros"]}
 serde_json = "1.0"
 tokio = { version = "1.49", features = ["full"] }
-api = { path = "../yeet-api", package = "yeet-api"}
+api = { path = "../yeet-api", package = "yeet-api", features = ["hazard"]}
 parking_lot = { version = "0.12", features = ["arc_lock"] }
 memmap2 = "0.9"
 uuid = { version = "1.10", features = ["v7", "serde"] }
@@ -37,6 +37,7 @@ serde_json_any_key.workspace = true
 jiff-sqlx = { version = "0.1.1", features = ["sqlite"] }
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
 futures = "0.3.32"
+error_set = "0.9.1"
 
 [dev-dependencies]
 paste = "1.0"

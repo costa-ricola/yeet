@@ -14,10 +14,12 @@ pub mod status;
 pub type StorePath = String;
 
 mod routes {
+    pub mod host;
     pub mod secret;
     pub mod verify;
 }
 
+pub use routes::host::*;
 pub use routes::secret::*;
 pub use routes::*;
 pub use secret::*;

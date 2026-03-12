@@ -1,35 +1,20 @@
 //! Yeet that Config
 
-use std::{
-    env,
-    fs::{File, OpenOptions},
-    hash::{DefaultHasher, Hash as _, Hasher as _},
-    os::unix::prelude::FileExt as _,
-    sync::Arc,
-    time::Duration,
-};
+use std::{env, fs::read_to_string, str::FromStr, sync::Arc};
 
-use api::key::get_verify_key;
 use axum::{
     Router,
     routing::{get, post, put},
 };
-use parking_lot::RwLock;
+
+use ed25519_dalek::VerifyingKey;
+#[cfg(test)]
+use sqlx::SqliteConnection;
 // use routes::status;
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
-use tokio::{net::TcpListener, time::interval};
+use tokio::net::TcpListener;
 
-use crate::{
-    // routes::{
-    //     detach, host,
-    //     key::{add_key, remove_key},
-    //     secret,
-    //     system_check::system_check,
-    //     update::update_hosts,
-    //     verify::{add_verification_attempt, is_host_verified, verify_attempt},
-    // },
-    state::AppState,
-}; // TODO: is this enough or do we need to use rand_chacha?
+// TODO: is this enough or do we need to use rand_chacha?
 
 mod error;
 mod httpsig;
@@ -38,13 +23,19 @@ mod routes {
     //     pub mod detach;
     //     pub mod host;
     //     pub mod key;
-    //     pub mod secret;
+    pub mod secret;
     //     pub mod status;
     //     pub mod system_check;
     //     pub mod update;
     pub mod verify;
 }
 pub use routes::*;
+
+#[derive(Clone)]
+pub(crate) struct YeetState {
+    pool: sqlx::SqlitePool,
+    age_key: Arc<age::x25519::Identity>,
+}
 
 mod db {
     pub mod hosts;
@@ -82,21 +73,44 @@ async fn main() {
             .await
             .expect("Could not bind to port")
     };
+
+    let age_key = {
+        let path = env::var("YEET_AGE_KEY").expect("YEET_AGE_KEY was not set");
+        let content = read_to_string(path).unwrap();
+        Arc::new(age::x25519::Identity::from_str(&content).unwrap())
+    };
+
     let pool = SqlitePoolOptions::new()
         .connect("sqlite:yeet.db")
         .await
         .expect("Can't connect to yeet.db");
 
-    axum::serve(listener, routes(pool))
+    let state = YeetState { pool, age_key };
+
+    axum::serve(listener, routes(state))
         .await
         .expect("Could not start axum");
 }
 
-fn routes(state: SqlitePool) -> Router {
+fn routes(state: YeetState) -> Router {
     Router::new()
         .route("/verification/add", post(verify::add_verification_attempt))
         .route("/verification/{id}/accept", put(verify::accept_attempt))
         .route("/verification/check", get(verify::is_host_verified))
+        // === Secrets
+        .route("/secret/add", post(secret::add_secret))
+        .route(
+            "/secret/{secret_id}/allow/{host_id}",
+            put(secret::allow_host),
+        )
+        // .route("/secret/{id}/rename", put(secret::rename_secret))
+        // .route("/secret/{id}/remove", delete(secret::remove_secret))
+        // .route("/secret/{secret_id}/block/{host_id}", put(secret::set_acl))
+        // .route("/secret/acl", get(secret::get_all_acl))
+        // .route("/secret/list", get(secret::list))
+        .route("/secret/server_key", get(secret::get_server_age_key)) // locked
+        .route("/secret", post(secret::get_secret)) // locked
+        // ===
         // .route("/system/check", post(system_check))
         // .route("/system/update", post(update_hosts))
         // .route("/key/add", post(add_key))
@@ -109,14 +123,6 @@ fn routes(state: SqlitePool) -> Router {
         // .route("/system/detach/permission", get(detach::is_detach_allowed))
         // .route("/detach/permission", post(detach::set_detach_permission))
         // .route("/detach/permission", get(detach::is_detach_global_allowed))
-        // .route("/secret/add", post(secret::add_secret))
-        // .route("/secret/rename", post(secret::rename_secret))
-        // .route("/secret/remove", post(secret::remove_secret))
-        // .route("/secret/acl", post(secret::set_acl))
-        // .route("/secret/acl/all", get(secret::get_all_acl))
-        // .route("/secret/list", get(secret::list))
-        // .route("/secret/server_key", get(secret::get_server_recipient))
-        // .route("/secret", post(secret::get_secret))
         .with_state(state)
 }
 
@@ -125,15 +131,48 @@ use axum_test::TestServer;
 
 #[cfg(test)]
 async fn test_server(pool: SqlitePool) -> TestServer {
+    let age_key = Arc::new(age::x25519::Identity::generate());
+    let state = YeetState { pool, age_key };
+    let mut conn = state.pool.acquire().await.unwrap();
+    sqlx::migrate!("../migrations")
+        .run(&mut conn)
+        .await
+        .unwrap();
+    let app = routes(state);
+    let server = TestServer::builder()
+        .expect_success_by_default()
+        .http_transport()
+        .build(app);
+
+    server
+}
+
+#[cfg(test)]
+async fn add_default_host(conn: &mut SqliteConnection) {
+    use httpsig_hyper::prelude::VerifyingKey as _;
+
+    let httpsig_key = httpsig_hyper::prelude::PublicKey::from_bytes(
+        &httpsig_hyper::prelude::AlgorithmName::Ed25519,
+        VerifyingKey::default().as_bytes(),
+    )
+    .unwrap();
+
+    db::hosts::add_host(
+        conn,
+        httpsig_key.key_id(),
+        VerifyingKey::default(),
+        "default_host".to_owned(),
+    )
+    .await
+    .unwrap();
+}
+
+#[cfg(test)]
+async fn sql_conn(pool: SqlitePool) -> sqlx::pool::PoolConnection<sqlx::Sqlite> {
     let mut conn = pool.acquire().await.unwrap();
     sqlx::migrate!("../migrations")
         .run(&mut conn)
         .await
         .unwrap();
-    let app = routes(pool.clone());
-    let server = TestServer::builder()
-        .expect_success_by_default()
-        .http_transport()
-        .build(app);
-    server
+    conn
 }
