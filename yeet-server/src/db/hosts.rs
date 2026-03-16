@@ -3,6 +3,8 @@ use jiff_sqlx::ToSqlx;
 
 use sqlx::Acquire;
 
+use crate::db;
+
 pub async fn hostname_by_verify_key(
     conn: &mut sqlx::SqliteConnection,
     key: VerifyingKey,
@@ -43,17 +45,8 @@ pub async fn add_host(
 ) -> Result<api::HostID, sqlx::Error> {
     let mut tx = conn.begin().await?;
     let now = jiff::Timestamp::now().to_sqlx();
-    let key = &key.as_bytes()[..];
-    let key = sqlx::query!(
-        r#"
-        INSERT INTO keys (keyid, verifying_key)
-        VALUES ($1, $2)"#,
-        keyid,
-        key
-    )
-    .execute(&mut *tx)
-    .await?
-    .last_insert_rowid();
+
+    let key = db::keys::add_key(&mut *tx, keyid, key).await?;
 
     let host = sqlx::query!(
         r#"

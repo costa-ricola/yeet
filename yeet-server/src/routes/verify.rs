@@ -45,13 +45,12 @@ pub async fn add_verification_attempt(
 /// Accept an verification attempt
 pub async fn accept_attempt(
     State(state): State<YeetState>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
     Path(id): Path<u32>,
     VerifiedJson(hostname): VerifiedJson<String>,
 ) -> Result<Json<Option<String>>, (StatusCode, String)> {
-    // todo admin auth
-
     let mut conn = state.pool.acquire().await.internal_server()?;
+    db::keys::auth_admin(&mut conn, key).await?;
 
     // TODO: return Bad request if key does not exist
     let facter = db::verification::accept_attempt(&mut conn, id as i64, hostname)

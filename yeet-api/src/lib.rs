@@ -76,7 +76,7 @@ pub struct AddKey {
 }
 
 #[expect(clippy::exhaustive_structs)]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Copy, sqlx::Type)]
 pub enum AuthLevel {
     Build,
     Admin,

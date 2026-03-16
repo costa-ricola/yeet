@@ -1,4 +1,3 @@
-use axum::response::IntoResponse;
 use ed25519_dalek::VerifyingKey;
 use httpsig_hyper::prelude::{AlgorithmName, PublicKey, VerifyingKey as _};
 use jiff_sqlx::ToSqlx as _;

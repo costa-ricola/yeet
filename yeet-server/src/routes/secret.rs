@@ -15,12 +15,12 @@ use crate::{
 
 pub async fn add_secret(
     State(state): State<YeetState>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
     Path(name): Path<String>,
     VerifiedJson(api::AddSecretRequest { secret }): VerifiedJson<api::AddSecretRequest>,
 ) -> Result<Json<api::SecretID>, (StatusCode, String)> {
-    // state.auth_admin(&key)?;
     let mut conn = state.pool.acquire().await.internal_server()?;
+    db::keys::auth_admin(&mut conn, key).await?;
 
     let id = db::secrets::add_secret(&mut conn, name, secret, &*state.age_key)
         .await
@@ -30,12 +30,11 @@ pub async fn add_secret(
 
 pub async fn rename_secret(
     State(state): State<YeetState>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
     Path((secret_id, name)): Path<(api::SecretID, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // state.auth_admin(&key)?;
-
     let mut conn = state.pool.acquire().await.internal_server()?;
+    db::keys::auth_admin(&mut conn, key).await?;
     db::secrets::rename_secret(&mut conn, secret_id, name)
         .await
         .bad_request()?;
@@ -46,10 +45,10 @@ pub async fn rename_secret(
 pub async fn delete_secret(
     State(state): State<YeetState>,
     Path(id): Path<api::SecretID>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // state.auth_admin(&key)?;
     let mut conn = state.pool.acquire().await.internal_server()?;
+    db::keys::auth_admin(&mut conn, key).await?;
     db::secrets::remove_secret(&mut conn, id)
         .await
         .bad_request()?;
@@ -60,10 +59,10 @@ pub async fn delete_secret(
 pub async fn allow_host(
     State(state): State<YeetState>,
     Path((secret_id, host_id)): Path<(api::SecretID, api::HostID)>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // state.auth_admin(&key)?;
     let mut conn = state.pool.acquire().await.internal_server()?;
+    db::keys::auth_admin(&mut conn, key).await?;
     db::secrets::add_access_for(&mut conn, secret_id, host_id)
         .await
         .bad_request()?;
@@ -74,10 +73,10 @@ pub async fn allow_host(
 pub async fn block_host(
     State(state): State<YeetState>,
     Path((secret_id, host_id)): Path<(api::SecretID, api::HostID)>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // state.auth_admin(&key)?;
     let mut conn = state.pool.acquire().await.internal_server()?;
+    db::keys::auth_admin(&mut conn, key).await?;
     db::secrets::remove_access_for(&mut conn, secret_id, host_id)
         .await
         .bad_request()?;
@@ -87,20 +86,19 @@ pub async fn block_host(
 
 pub async fn get_all_acl(
     State(state): State<YeetState>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
 ) -> Result<Json<HashMap<api::SecretID, Vec<api::HostID>>>, (StatusCode, String)> {
-    // let state = state.read_arc();
     let mut conn = state.pool.acquire().await.internal_server()?;
+    db::keys::auth_admin(&mut conn, key).await?;
     Ok(Json(db::secrets::list_acl(&mut conn).await.bad_request()?))
 }
 
 pub async fn list(
     State(state): State<YeetState>,
-    HttpSig(_key): HttpSig,
+    HttpSig(key): HttpSig,
 ) -> Result<Json<Vec<api::SecretName>>, (StatusCode, String)> {
-    // state.auth_admin(&key)?;
     let mut conn = state.pool.acquire().await.internal_server()?;
-
+    db::keys::auth_admin(&mut conn, key).await?;
     Ok(Json(
         db::secrets::list_secrets(&mut conn).await.bad_request()?,
     ))

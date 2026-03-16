@@ -22,7 +22,7 @@ mod state;
 mod routes {
     //     pub mod detach;
     //     pub mod host;
-    //     pub mod key;
+    pub(crate) mod key;
     pub(crate) mod secret;
     //     pub mod status;
     //     pub mod system_check;
@@ -113,11 +113,12 @@ fn routes(state: YeetState) -> Router {
         .route("/secret/acl", get(secret::get_all_acl))
         .route("/secret/server_key", get(secret::get_server_age_key)) // locked
         .route("/secret", post(secret::get_secret)) // locked
+        // === Keys
+        .route("/key/add", post(key::add_key))
+        .route("/key/remove", post(key::remove_key))
         // ===
         // .route("/system/check", post(system_check))
         // .route("/system/update", post(update_hosts))
-        // .route("/key/add", post(add_key))
-        // .route("/key/remove", post(remove_key))
         // .route("/status", get(status::status))
         // .route("/status/host_by_key", get(status::hosts_by_key))
         // .route("/host/remove", post(host::remove_host))
