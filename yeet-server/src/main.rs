@@ -7,7 +7,6 @@ use axum::{
     routing::{delete, get, post, put},
 };
 
-use ed25519_dalek::VerifyingKey;
 #[cfg(test)]
 use sqlx::SqliteConnection;
 // use routes::status;
@@ -21,7 +20,7 @@ mod httpsig;
 mod state;
 mod routes {
     //     pub mod detach;
-    //     pub mod host;
+    pub(crate) mod host;
     pub(crate) mod key;
     pub(crate) mod secret;
     //     pub mod status;
@@ -115,14 +114,14 @@ fn routes(state: YeetState) -> Router {
         .route("/secret", post(secret::get_secret)) // locked
         // === Keys
         .route("/key/add", post(key::add_key))
-        .route("/key/remove", post(key::remove_key))
+        .route("/key/delete", delete(key::delete_key))
+        // === Hosts
+        .route("/host/list", get(host::list))
+        .route("/host/{id}/rename/{name}", put(host::rename_host))
         // ===
-        // .route("/system/check", post(system_check))
+        // .route("/system/check", post(system_check)) // locked
         // .route("/system/update", post(update_hosts))
-        // .route("/status", get(status::status))
         // .route("/status/host_by_key", get(status::hosts_by_key))
-        // .route("/host/remove", post(host::remove_host))
-        // .route("/host/rename", post(host::rename_host))
         // .route("/system/detach", post(detach::detach_host))
         // .route("/system/detach/permission", get(detach::is_detach_allowed))
         // .route("/detach/permission", post(detach::set_detach_permission))
@@ -157,14 +156,14 @@ async fn add_default_host(conn: &mut SqliteConnection) {
 
     let httpsig_key = httpsig_hyper::prelude::PublicKey::from_bytes(
         &httpsig_hyper::prelude::AlgorithmName::Ed25519,
-        VerifyingKey::default().as_bytes(),
+        ed25519_dalek::VerifyingKey::default().as_bytes(),
     )
     .unwrap();
 
     db::hosts::add_host(
         conn,
         httpsig_key.key_id(),
-        VerifyingKey::default(),
+        ed25519_dalek::VerifyingKey::default(),
         "default_host".to_owned(),
     )
     .await

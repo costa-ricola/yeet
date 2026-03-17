@@ -11,11 +11,9 @@ use crate::{
 pub async fn add_key(
     State(state): State<YeetState>,
     HttpSig(http_key): HttpSig,
-
     VerifiedJson(api::AddKey { key, level }): VerifiedJson<api::AddKey>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
-
     db::keys::auth_admin(&mut conn, http_key).await?;
 
     let httpsig_key = httpsig_hyper::prelude::PublicKey::from_bytes(
@@ -31,7 +29,7 @@ pub async fn add_key(
     Ok(StatusCode::CREATED)
 }
 
-pub async fn remove_key(
+pub async fn delete_key(
     State(state): State<YeetState>,
     HttpSig(http_key): HttpSig,
     VerifiedJson(key): VerifiedJson<VerifyingKey>,

@@ -5,6 +5,45 @@ use sqlx::Acquire;
 
 use crate::db;
 
+pub async fn list(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::host::Host>, sqlx::Error> {
+    Ok(sqlx::query!(
+        r#"
+        SELECT hosts.id, hostname, keys.verifying_key
+        FROM hosts
+        JOIN keys on hosts.key_id = keys.id"#
+    )
+    .map(|r| api::host::Host {
+        id: api::HostID::new(r.id),
+        hostname: r.hostname,
+        key: VerifyingKey::from_bytes(
+            &r.verifying_key
+                .try_into()
+                .expect("We only store valid keys"),
+        )
+        .expect("We only store valid keys"),
+    })
+    .fetch_all(conn)
+    .await?)
+}
+
+pub async fn rename(
+    conn: &mut sqlx::SqliteConnection,
+    id: api::HostID,
+    new: String,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        UPDATE hosts
+        SET hostname = $1
+        WHERE id = $2"#,
+        new,
+        id
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 pub async fn hostname_by_verify_key(
     conn: &mut sqlx::SqliteConnection,
     key: VerifyingKey,
@@ -61,16 +100,6 @@ pub async fn add_host(
 
     tx.commit().await?;
     Ok(api::HostID::new(host.last_insert_rowid()))
-}
-
-pub async fn remove_host(
-    conn: &mut sqlx::SqliteConnection,
-    host: api::HostID,
-) -> Result<(), sqlx::Error> {
-    sqlx::query!(r#"DELETE FROM hosts WHERE id = $1"#, host)
-        .execute(conn)
-        .await?;
-    Ok(())
 }
 
 // pub async fn add_version(conn: &mut sqlx::SqliteConnection, host: HostID,store_path) -> Result<()> {

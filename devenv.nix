@@ -21,6 +21,7 @@ in
     pkg-config
     pkgs-unstable.mdbook
     sqlx-cli
+    bacon
     # mdbook-mermaid
   ];
   env.RUSTFLAGS = "--cfg tokio_unstable";

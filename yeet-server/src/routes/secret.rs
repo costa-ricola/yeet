@@ -142,7 +142,7 @@ pub async fn get_secret(
     Ok(Json(secret))
 }
 #[cfg(test)]
-mod test_verification {
+mod test_secret {
     use std::{collections::HashMap, str::FromStr};
 
     use sqlx::SqlitePool;

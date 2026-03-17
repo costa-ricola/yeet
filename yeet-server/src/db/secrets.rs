@@ -524,7 +524,10 @@ mod test {
             .await
             .unwrap();
 
-        db::hosts::remove_host(&mut conn, my_host).await.unwrap();
+        sqlx::query!(r#"DELETE FROM hosts WHERE id = $1"#, my_host)
+            .execute(&mut *conn)
+            .await
+            .unwrap();
 
         assert!(
             !db::secrets::list_secrets(&mut conn)
