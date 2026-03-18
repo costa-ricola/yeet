@@ -1,11 +1,6 @@
-use std::sync::Arc;
+use axum::{extract::State, http::StatusCode};
 
-use axum::{Json, extract::State, http::StatusCode};
-
-use crate::{
-    httpsig::{HttpSig, VerifiedJson},
-    state::{AppState, StateError},
-};
+use crate::{YeetState, db, error::InternalError as _, httpsig::HttpSig};
 
 // TODO: currently there are no detach permissions
 // all hosts are allowed to detach
@@ -36,20 +31,47 @@ use crate::{
 //     Ok(StatusCode::OK)
 // }
 
-/// Detach either self or another host(requires admin)
-pub async fn detach_host(
-    State(state): State<Arc<RwLock<AppState>>>,
+/// Detach self
+pub async fn detach(
+    State(state): State<YeetState>,
     HttpSig(key): HttpSig,
-    VerifiedJson(detach): VerifiedJson<api::DetachAction>,
-) -> Result<StatusCode, StateError> {
-    let mut state = state.write_arc();
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut conn = state.pool.acquire().await.internal_server()?;
 
-    match detach {
-        api::DetachAction::DetachSelf => state.detach_self(&key)?,
-        api::DetachAction::DetachHost(hostname) => state.detach_host(&hostname)?,
-        api::DetachAction::AttachSelf => state.attach_self(&key)?,
-        api::DetachAction::AttachHost(hostname) => state.attach_host(&hostname)?,
-    }
+    let Some(host) = db::hosts::host_by_verify_key(&mut conn, key)
+        .await
+        .internal_server()?
+    else {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Unknown keyid. You are not a registered host".to_owned(),
+        ));
+    };
+    db::hosts::set_provision_state(&mut conn, host, api::ProvisionState::Detached)
+        .await
+        .internal_server()?;
+
+    Ok(StatusCode::OK)
+}
+/// Attach self
+pub async fn attach(
+    State(state): State<YeetState>,
+    HttpSig(key): HttpSig,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut conn = state.pool.acquire().await.internal_server()?;
+
+    let Some(host) = db::hosts::host_by_verify_key(&mut conn, key)
+        .await
+        .internal_server()?
+    else {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Unknown keyid. You are not a registered host".to_owned(),
+        ));
+    };
+    db::hosts::set_provision_state(&mut conn, host, api::ProvisionState::Provisioned)
+        .await
+        .internal_server()?;
 
     Ok(StatusCode::OK)
 }

@@ -10,7 +10,7 @@ use axum::{
 #[cfg(test)]
 use sqlx::SqliteConnection;
 // use routes::status;
-use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
+use sqlx::sqlite::SqlitePoolOptions;
 use tokio::net::TcpListener;
 
 // TODO: is this enough or do we need to use rand_chacha?
@@ -19,7 +19,7 @@ mod error;
 mod httpsig;
 mod state;
 mod routes {
-    // pub(crate) mod detach;
+    pub(crate) mod detach;
     pub(crate) mod host;
     pub(crate) mod key;
     pub(crate) mod secret;
@@ -118,8 +118,8 @@ fn routes(state: YeetState) -> Router {
         .route("/host/list", get(host::list))
         .route("/host/{id}/rename/{name}", put(host::rename_host))
         // === Detach
-        // .route("/system/self/detach", put(detach::detach))
-        // // .route("/system/self/attach", put(detach::attach))
+        .route("/system/self/detach", put(detach::detach))
+        .route("/system/self/attach", put(detach::attach))
         // === System
         .route("/system/check", post(system_check::system_check)) // locked
         .route("/system/update", post(update::update_hosts))
@@ -130,7 +130,7 @@ fn routes(state: YeetState) -> Router {
 use axum_test::TestServer;
 
 #[cfg(test)]
-async fn test_server(pool: SqlitePool) -> TestServer {
+async fn test_server(pool: sqlx::SqlitePool) -> TestServer {
     let age_key = Arc::new(age::x25519::Identity::generate());
     let state = YeetState { pool, age_key };
     let mut conn = state.pool.acquire().await.unwrap();
@@ -168,7 +168,7 @@ async fn add_default_host(conn: &mut SqliteConnection) {
 }
 
 #[cfg(test)]
-async fn sql_conn(pool: SqlitePool) -> sqlx::pool::PoolConnection<sqlx::Sqlite> {
+async fn sql_conn(pool: sqlx::SqlitePool) -> sqlx::pool::PoolConnection<sqlx::Sqlite> {
     let mut conn = pool.acquire().await.unwrap();
     sqlx::migrate!("../migrations")
         .run(&mut conn)
