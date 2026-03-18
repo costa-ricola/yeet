@@ -44,10 +44,7 @@ pub async fn add_verification_attempt(
     }
 
     // check if key already is in registered keys
-    if db::hosts::hostname_by_verify_key(conn, key)
-        .await?
-        .is_some()
-    {
+    if db::hosts::host_by_verify_key(conn, key).await?.is_some() {
         return Err(AddVerificationError::KeyAlreadyInUse);
     }
 

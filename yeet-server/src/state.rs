@@ -78,342 +78,326 @@ fn create_age_identity() -> String {
         .to_string()
 }
 
-impl AppState {
-    /// This is the "ping" command every client should send in a specific interval.
-    /// Based on the provision state and the last known version this function takes different parts
-    ///
-    /// `host.latest_store_path()`
-    /// `host.provision_state`
-    ///
-    /// `host.last_ping` = `Zoned::now`
-    ///
-    /// ====== if `host.provision_state` == Provisioned
-    ///
-    /// # this is the path when the client did the update
-    /// # if "host version is behind but sent version and provision version match"
-    /// if `host.latest_store_path()` != `store_path` and `store_path` == `host.provision_state`
-    ///     `host.version_history.insert(store_path`, `Zoned::now`)
-    ///     -> Nothing
-    ///
-    /// # this is the path when the client gets notified of an update
-    /// # if "host AND sent version is behind but server version is different"
-    /// but because there could be a race condition e.g. Update1(v1) -> client does update1 in this time server gets Update2
-    /// therefore we need to check if sent version is behind server version
-    /// if `host.latest_store_path()` == `store_path` && `host.latest_store_path()` != `host.provision_state`
-    ///     -> `SwitchTo(host.provision_state)`
-    ///
-    /// # Lastly if all 3 are the same do nothing
-    /// -> Nothing
-    ///
-    /// ====== if `host.provision_state` == Detached
-    ///
-    /// # check if `store_path` is the same as `host.latest_store_path()` if not the update `host.latest_store_path()`
-    /// -> Detach
-    ///
-    /// ====== if `host.provision_state` == `NotSet`
-    /// -> Nothing
-    pub fn system_check(
-        &mut self,
-        store_path: String,
-        key: &VerifyingKey,
-    ) -> Result<api::AgentAction> {
-        let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
-        let host = self
-            .hosts
-            .get_mut(hostname)
-            .ok_or(StateError::HostNotFound)?;
+// impl AppState {
+//     /// This is the "ping" command every client should send in a specific interval.
+//     /// Based on the provision state and the last known version this function takes different parts
+//     ///
+//     /// `host.latest_store_path()`
+//     /// `host.provision_state`
+//     ///
+//     /// `host.last_ping` = `Zoned::now`
+//     ///
+//     /// ====== if `host.provision_state` == Provisioned
+//     ///
+//     /// # this is the path when the client did the update
+//     /// # if "host version is behind but sent version and provision version match"
+//     /// if `host.latest_store_path()` != `store_path` and `store_path` == `host.provision_state`
+//     ///     `host.version_history.insert(store_path`, `Zoned::now`)
+//     ///     -> Nothing
+//     ///
+//     /// # this is the path when the client gets notified of an update
+//     /// # if "host AND sent version is behind but server version is different"
+//     /// but because there could be a race condition e.g. Update1(v1) -> client does update1 in this time server gets Update2
+//     /// therefore we need to check if sent version is behind server version
+//     /// if `host.latest_store_path()` == `store_path` && `host.latest_store_path()` != `host.provision_state`
+//     ///     -> `SwitchTo(host.provision_state)`
+//     ///
+//     /// # Lastly if all 3 are the same do nothing
+//     /// -> Nothing
+//     ///
+//     /// ====== if `host.provision_state` == Detached
+//     ///
+//     /// # check if `store_path` is the same as `host.latest_store_path()` if not the update `host.latest_store_path()`
+//     /// -> Detach
+//     ///
+//     /// ====== if `host.provision_state` == `NotSet`
+//     /// -> Nothing
+//     pub fn system_check(
+//         &mut self,
+//         store_path: String,
+//         key: &VerifyingKey,
+//     ) -> Result<api::AgentAction> {
+//         let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
+//         let host = self
+//             .hosts
+//             .get_mut(hostname)
+//             .ok_or(StateError::HostNotFound)?;
 
-        let action = match host.provision_state.clone() {
-            api::ProvisionState::NotSet => api::AgentAction::Nothing,
-            // Host is detached -> only updated the latest version
-            api::ProvisionState::Detached(_) => {
-                if host.latest_store_path() != &store_path {
-                    host.update_store_path(store_path);
-                }
-                api::AgentAction::Detach
-            }
+//         let action = match host.provision_state.clone() {
+//             api::ProvisionState::NotSet => api::AgentAction::Nothing,
+//             // Host is detached -> only updated the latest version
+//             api::ProvisionState::Detached => {
+//                 if host.latest_store_path() != &store_path {
+//                     host.update_store_path(store_path);
+//                 }
+//                 api::AgentAction::Detach
+//             }
 
-            api::ProvisionState::Provisioned(version) => {
-                // Host has completed an update -> update last seen store path
-                if &store_path != host.latest_store_path() {
-                    host.update_store_path(store_path.clone());
-                }
-                // Host is on the newest version
-                if store_path == version.store_path {
-                    api::AgentAction::Nothing
-                } else {
-                    // Host needs to update
-                    // TODO: we do not see if we updated fast in succession we only see the latest
-                    api::AgentAction::SwitchTo(version.clone())
-                }
-            }
-        };
+//             api::ProvisionState::Provisioned => {
+//                 // Host has completed an update -> update last seen store path
+//                 if &store_path != host.latest_store_path() {
+//                     host.update_store_path(store_path.clone());
+//                 }
+//                 // Host is on the newest version
+//                 if store_path == version.store_path {
+//                     api::AgentAction::Nothing
+//                 } else {
+//                     // Host needs to update
+//                     // TODO: we do not see if we updated fast in succession we only see the latest
+//                     api::AgentAction::SwitchTo(version.clone())
+//                 }
+//             }
+//         };
 
-        host.ping();
+//         host.ping();
 
-        Ok(action)
-    }
+//         Ok(action)
+//     }
 
-    /// Endpoint to set a new version for a host.
-    /// The whole request needs to be signed by a build machine.
-    /// The update consist of a simple `name` -> `version` and a `substitutor` which is where the agent should get its update
-    /// This means that for each origin e.g. cachix, you need to call update seperately
-    pub fn update_hosts(
-        &mut self,
-        mut hosts: HashMap<String, api::StorePath>,
-        public_key: String,
-        substitutor: String,
-    ) {
-        let _unknown_hosts = hosts
-            .extract_if(|name, _store| !self.hosts.contains_key(name))
-            .collect::<HashMap<String, api::StorePath>>();
+//     /// Endpoint to set a new version for a host.
+//     /// The whole request needs to be signed by a build machine.
+//     /// The update consist of a simple `name` -> `version` and a `substitutor` which is where the agent should get its update
+//     /// This means that for each origin e.g. cachix, you need to call update seperately
+//     pub fn update_hosts(
+//         &mut self,
+//         mut hosts: HashMap<String, api::StorePath>,
+//         public_key: String,
+//         substitutor: String,
+//     ) {
+//         let _unknown_hosts = hosts
+//             .extract_if(|name, _store| !self.hosts.contains_key(name))
+//             .collect::<HashMap<String, api::StorePath>>();
 
-        for (name, store_path) in hosts {
-            let host = self
-                .hosts
-                .get_mut(&name)
-                .expect("Race condition because we checked above - maybe change this TOCTOU");
-            let version = api::RemoteStorePath {
-                store_path: store_path.clone(),
-                substitutor: substitutor.clone(),
-                public_key: public_key.clone(),
-            };
+//         for (name, store_path) in hosts {
+//             let host = self
+//                 .hosts
+//                 .get_mut(&name)
+//                 .expect("Race condition because we checked above - maybe change this TOCTOU");
+//             let version = api::RemoteStorePath {
+//                 store_path: store_path.clone(),
+//                 substitutor: substitutor.clone(),
+//                 public_key: public_key.clone(),
+//             };
 
-            host.push_update(version);
-        }
-    }
+//             host.push_update(version);
+//         }
+//     }
 
-    pub fn auth_build(&self, key: &VerifyingKey) -> Result<()> {
-        if self.admin_credentials.contains(key) || self.build_machines_credentials.contains(key) {
-            Ok(())
-        } else {
-            Err(StateError::AuthMissingBuild)
-        }
-    }
+//     pub(crate) fn hosts(&self) -> hash_map::Values<'_, String, api::Host> {
+//         self.hosts.values()
+//     }
 
-    pub fn auth_admin(&self, key: &VerifyingKey) -> Result<()> {
-        if self.admin_credentials.contains(key) {
-            Ok(())
-        } else {
-            Err(StateError::AuthMissingAdmin)
-        }
-    }
+//     pub(crate) fn hosts_by_key(&self) -> HashMap<Hostname, VerifyingKey> {
+//         self.host_by_key
+//             .clone()
+//             .into_iter()
+//             .map(|(k, v)| (v, k))
+//             .collect()
+//     }
 
-    pub(crate) fn hosts(&self) -> hash_map::Values<'_, String, api::Host> {
-        self.hosts.values()
-    }
+//     pub fn add_key(&mut self, key: VerifyingKey, level: api::AuthLevel) {
+//         let signing_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, key.as_bytes())
+//             .expect("Could not convert ED25519 key to httpsig key - wtf");
+//         if level == api::AuthLevel::Admin {
+//             self.admin_credentials.insert(key);
+//         } else {
+//             self.build_machines_credentials.insert(key);
+//         }
+//         self.keyids.insert(signing_key.key_id(), key);
+//     }
 
-    pub(crate) fn hosts_by_key(&self) -> HashMap<Hostname, VerifyingKey> {
-        self.host_by_key
-            .clone()
-            .into_iter()
-            .map(|(k, v)| (v, k))
-            .collect()
-    }
+//     pub fn remove_key(&mut self, key: &VerifyingKey) {
+//         let signing_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, key.as_bytes())
+//             .expect("Could not convert ED25519 key to httpsig key - wtf");
+//         self.admin_credentials.remove(key);
+//         self.build_machines_credentials.remove(key);
+//         self.host_by_key.remove(key);
+//         self.keyids.remove(&signing_key.key_id());
+//     }
 
-    pub fn add_key(&mut self, key: VerifyingKey, level: api::AuthLevel) {
-        let signing_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, key.as_bytes())
-            .expect("Could not convert ED25519 key to httpsig key - wtf");
-        if level == api::AuthLevel::Admin {
-            self.admin_credentials.insert(key);
-        } else {
-            self.build_machines_credentials.insert(key);
-        }
-        self.keyids.insert(signing_key.key_id(), key);
-    }
+//     pub fn remove_host(&mut self, hostname: &Hostname) -> Result<api::Host> {
+//         let host = self
+//             .hosts
+//             .remove(hostname)
+//             .ok_or(StateError::HostNotFound)?;
 
-    pub fn remove_key(&mut self, key: &VerifyingKey) {
-        let signing_key = PublicKey::from_bytes(&AlgorithmName::Ed25519, key.as_bytes())
-            .expect("Could not convert ED25519 key to httpsig key - wtf");
-        self.admin_credentials.remove(key);
-        self.build_machines_credentials.remove(key);
-        self.host_by_key.remove(key);
-        self.keyids.remove(&signing_key.key_id());
-    }
+//         let _ = self.host_by_key.extract_if(|_key, name| name == hostname);
 
-    pub fn remove_host(&mut self, hostname: &Hostname) -> Result<api::Host> {
-        let host = self
-            .hosts
-            .remove(hostname)
-            .ok_or(StateError::HostNotFound)?;
+//         self.purge_keyids();
 
-        let _ = self.host_by_key.extract_if(|_key, name| name == hostname);
+//         // self.secrets.remove_host(hostname);
 
-        self.purge_keyids();
+//         Ok(host)
+//     }
 
-        // self.secrets.remove_host(hostname);
+//     pub fn purge_keyids(&mut self) {
+//         let keys = self.keyids.extract_if(|_id, k| {
+//             !(self.host_by_key.contains_key(k)
+//                 || self.admin_credentials.contains(k)
+//                 || self.build_machines_credentials.contains(k))
+//         });
+//         println!("removed: {:?}", keys.collect::<Vec<_>>())
+//     }
 
-        Ok(host)
-    }
+//     pub fn rename_host(&mut self, old_name: &Hostname, new_name: Hostname) -> Result<()> {
+//         let mut host = self
+//             .hosts
+//             .remove(old_name)
+//             .ok_or(StateError::HostNotFound)?;
+//         host.name.clone_from(&new_name); // Make sure the two names are the same
+//         self.hosts.insert(new_name.clone(), host);
 
-    pub fn purge_keyids(&mut self) {
-        let keys = self.keyids.extract_if(|_id, k| {
-            !(self.host_by_key.contains_key(k)
-                || self.admin_credentials.contains(k)
-                || self.build_machines_credentials.contains(k))
-        });
-        println!("removed: {:?}", keys.collect::<Vec<_>>())
-    }
+//         if let Some((_key, hostname)) = self
+//             .host_by_key
+//             .iter_mut()
+//             .find(|(_key, name)| *name == old_name)
+//         {
+//             hostname.clone_from(&new_name);
+//         }
+//         // self.secrets.rename_host(old_name.clone(), new_name);
 
-    pub fn rename_host(&mut self, old_name: &Hostname, new_name: Hostname) -> Result<()> {
-        let mut host = self
-            .hosts
-            .remove(old_name)
-            .ok_or(StateError::HostNotFound)?;
-        host.name.clone_from(&new_name); // Make sure the two names are the same
-        self.hosts.insert(new_name.clone(), host);
+//         Ok(())
+//     }
 
-        if let Some((_key, hostname)) = self
-            .host_by_key
-            .iter_mut()
-            .find(|(_key, name)| *name == old_name)
-        {
-            hostname.clone_from(&new_name);
-        }
-        // self.secrets.rename_host(old_name.clone(), new_name);
+//     pub fn set_global_detach_permission(&mut self, allowed: bool) {
+//         self.detach_allowed = allowed;
+//     }
 
-        Ok(())
-    }
+//     pub fn get_global_detach_permission(&self) -> bool {
+//         self.detach_allowed
+//     }
 
-    pub fn set_global_detach_permission(&mut self, allowed: bool) {
-        self.detach_allowed = allowed;
-    }
+//     pub fn set_detach_permissions(&mut self, hosts: Vec<(Hostname, bool)>) {
+//         for (hostname, allowed) in hosts {
+//             let Some(host) = self.hosts.get_mut(&hostname) else {
+//                 continue;
+//             };
+//             host.detach_allowed = Some(allowed);
+//         }
+//     }
 
-    pub fn get_global_detach_permission(&self) -> bool {
-        self.detach_allowed
-    }
+//     pub fn is_detach_allowed(&self, key: &VerifyingKey) -> Result<bool> {
+//         let host = {
+//             let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
+//             self.hosts.get(hostname).ok_or(StateError::HostNotFound)?
+//         };
 
-    pub fn set_detach_permissions(&mut self, hosts: Vec<(Hostname, bool)>) {
-        for (hostname, allowed) in hosts {
-            let Some(host) = self.hosts.get_mut(&hostname) else {
-                continue;
-            };
-            host.detach_allowed = Some(allowed);
-        }
-    }
+//         Ok(host.detach_allowed.unwrap_or(self.detach_allowed))
+//     }
 
-    pub fn is_detach_allowed(&self, key: &VerifyingKey) -> Result<bool> {
-        let host = {
-            let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
-            self.hosts.get(hostname).ok_or(StateError::HostNotFound)?
-        };
+//     pub fn detach_self(&mut self, key: &VerifyingKey) -> Result<()> {
+//         let host = {
+//             let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
+//             self.hosts
+//                 .get_mut(hostname)
+//                 .ok_or(StateError::HostNotFound)?
+//         };
 
-        Ok(host.detach_allowed.unwrap_or(self.detach_allowed))
-    }
+//         {
+//             let allowed = host.detach_allowed.unwrap_or(self.detach_allowed);
 
-    pub fn detach_self(&mut self, key: &VerifyingKey) -> Result<()> {
-        let host = {
-            let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
-            self.hosts
-                .get_mut(hostname)
-                .ok_or(StateError::HostNotFound)?
-        };
+//             if !allowed {
+//                 return Err(StateError::DetachNotAllowed);
+//             }
+//         };
 
-        {
-            let allowed = host.detach_allowed.unwrap_or(self.detach_allowed);
+//         host.detach();
+//         Ok(())
+//     }
 
-            if !allowed {
-                return Err(StateError::DetachNotAllowed);
-            }
-        };
+//     // Warning: This should only ever be called by admins because it will bypass detach permissions
+//     pub fn detach_host(&mut self, hostname: &Hostname) -> Result<()> {
+//         let host = self
+//             .hosts
+//             .get_mut(hostname)
+//             .ok_or(StateError::HostNotFound)?;
 
-        host.detach();
-        Ok(())
-    }
+//         host.detach();
+//         Ok(())
+//     }
 
-    // Warning: This should only ever be called by admins because it will bypass detach permissions
-    pub fn detach_host(&mut self, hostname: &Hostname) -> Result<()> {
-        let host = self
-            .hosts
-            .get_mut(hostname)
-            .ok_or(StateError::HostNotFound)?;
+//     pub fn attach_self(&mut self, key: &VerifyingKey) -> Result<()> {
+//         let host = {
+//             let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
+//             self.hosts
+//                 .get_mut(hostname)
+//                 .ok_or(StateError::HostNotFound)?
+//         };
 
-        host.detach();
-        Ok(())
-    }
+//         host.attach();
+//         Ok(())
+//     }
 
-    pub fn attach_self(&mut self, key: &VerifyingKey) -> Result<()> {
-        let host = {
-            let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
-            self.hosts
-                .get_mut(hostname)
-                .ok_or(StateError::HostNotFound)?
-        };
+//     pub fn attach_host(&mut self, hostname: &Hostname) -> Result<()> {
+//         let host = self
+//             .hosts
+//             .get_mut(hostname)
+//             .ok_or(StateError::HostNotFound)?;
 
-        host.attach();
-        Ok(())
-    }
+//         host.attach();
+//         Ok(())
+//     }
 
-    pub fn attach_host(&mut self, hostname: &Hostname) -> Result<()> {
-        let host = self
-            .hosts
-            .get_mut(hostname)
-            .ok_or(StateError::HostNotFound)?;
+//     pub fn has_admin_credential(&self) -> bool {
+//         !self.admin_credentials.is_empty()
+//     }
 
-        host.attach();
-        Ok(())
-    }
+//     pub fn get_key_by_id<S: AsRef<str>>(&self, keyid: S) -> Option<VerifyingKey> {
+//         self.keyids.get(keyid.as_ref()).copied()
+//     }
 
-    pub fn has_admin_credential(&self) -> bool {
-        !self.admin_credentials.is_empty()
-    }
+// pub fn add_secret<S: Into<String>, V: Into<Vec<u8>>>(
+//     &mut self,
+//     name: S,
+//     secret: V,
+// ) -> Result<()> {
+//     let store_key = age::x25519::Identity::from_str(&self.age_identity)
+//         .map_err(StateError::StoreKeyDecryptionError)?;
+//     self.secrets.add_secret(name, secret, &store_key)?;
+//     Ok(())
+// }
 
-    pub fn get_key_by_id<S: AsRef<str>>(&self, keyid: S) -> Option<VerifyingKey> {
-        self.keyids.get(keyid.as_ref()).copied()
-    }
+// pub fn rename_secret<S: Into<String>>(&mut self, current_name: S, new_name: S) {
+//     self.secrets.rename_secret(current_name, new_name);
+// }
+// pub fn remove_secret<S: Into<String>>(&mut self, secret_name: S) {
+//     self.secrets.remove_secret(secret_name);
+// }
 
-    // pub fn add_secret<S: Into<String>, V: Into<Vec<u8>>>(
-    //     &mut self,
-    //     name: S,
-    //     secret: V,
-    // ) -> Result<()> {
-    //     let store_key = age::x25519::Identity::from_str(&self.age_identity)
-    //         .map_err(StateError::StoreKeyDecryptionError)?;
-    //     self.secrets.add_secret(name, secret, &store_key)?;
-    //     Ok(())
-    // }
+// pub fn secret_add_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
+//     self.secrets.add_access_for(secret, host);
+// }
+// pub fn secret_remove_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
+//     self.secrets.remove_access_for(secret, host);
+// }
+// pub fn get_all_acl(&self) -> HashMap<String, Vec<String>> {
+//     self.secrets.get_all_acl()
+// }
+// pub fn list_secrets(&self) -> Vec<String> {
+//     self.secrets.list_secrets()
+// }
+// pub fn get_server_recipient(&self) -> Result<String> {
+//     Ok(age::x25519::Identity::from_str(&self.age_identity)
+//         .map_err(StateError::StoreKeyDecryptionError)?
+//         .to_public()
+//         .to_string())
+// }
+// pub fn get_secret(
+//     &self,
+//     secret: String,
+//     recipient: String,
+//     key: &VerifyingKey,
+// ) -> Result<Option<Vec<u8>>> {
+//     let store_key = age::x25519::Identity::from_str(&self.age_identity)
+//         .map_err(StateError::StoreKeyDecryptionError)?;
 
-    // pub fn rename_secret<S: Into<String>>(&mut self, current_name: S, new_name: S) {
-    //     self.secrets.rename_secret(current_name, new_name);
-    // }
-    // pub fn remove_secret<S: Into<String>>(&mut self, secret_name: S) {
-    //     self.secrets.remove_secret(secret_name);
-    // }
+//     let recipient =
+//         age::x25519::Recipient::from_str(&recipient).map_err(StateError::RecipientKeyError)?;
 
-    // pub fn secret_add_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
-    //     self.secrets.add_access_for(secret, host);
-    // }
-    // pub fn secret_remove_access_for<S: Into<String>>(&mut self, secret: S, host: S) {
-    //     self.secrets.remove_access_for(secret, host);
-    // }
-    // pub fn get_all_acl(&self) -> HashMap<String, Vec<String>> {
-    //     self.secrets.get_all_acl()
-    // }
-    // pub fn list_secrets(&self) -> Vec<String> {
-    //     self.secrets.list_secrets()
-    // }
-    pub fn get_server_recipient(&self) -> Result<String> {
-        Ok(age::x25519::Identity::from_str(&self.age_identity)
-            .map_err(StateError::StoreKeyDecryptionError)?
-            .to_public()
-            .to_string())
-    }
-    // pub fn get_secret(
-    //     &self,
-    //     secret: String,
-    //     recipient: String,
-    //     key: &VerifyingKey,
-    // ) -> Result<Option<Vec<u8>>> {
-    //     let store_key = age::x25519::Identity::from_str(&self.age_identity)
-    //         .map_err(StateError::StoreKeyDecryptionError)?;
+//     let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
 
-    //     let recipient =
-    //         age::x25519::Recipient::from_str(&recipient).map_err(StateError::RecipientKeyError)?;
-
-    //     let hostname = self.host_by_key.get(key).ok_or(StateError::HostNotFound)?;
-
-    //     Ok(self
-    //         .secrets
-    //         .get_secret_for(&secret, &store_key, hostname, &recipient)?)
-    // }
-}
+//     Ok(self
+//         .secrets
+//         .get_secret_for(&secret, &store_key, hostname, &recipient)?)
+// }
+// }

@@ -31,6 +31,7 @@ pub use secret::*;
     clippy::exhaustive_structs,
     reason = "API Structs should be breaking change"
 )]
+// TODO: Split into remote lookup
 pub struct HostUpdateRequest {
     /// The hosts to update identified by their name
     pub hosts: HashMap<String, StorePath>,
@@ -155,25 +156,25 @@ impl Host {
         self.version_history.push((store_path, Zoned::now()));
     }
 
-    pub fn push_update(&mut self, version: RemoteStorePath) {
-        if self.is_provisioned() || self.is_notset() {
-            self.provision_state = ProvisionState::Provisioned(version);
-        } else if self.is_detached() {
-            self.provision_state = ProvisionState::Detached(version)
-        }
-    }
+    // pub fn push_update(&mut self, version: RemoteStorePath) {
+    //     if self.is_provisioned() || self.is_notset() {
+    //         self.provision_state = ProvisionState::Provisioned(version);
+    //     } else if self.is_detached() {
+    //         self.provision_state = ProvisionState::Detached(version)
+    //     }
+    // }
 
-    pub fn detach(&mut self) {
-        if let ProvisionState::Provisioned(version) = &self.provision_state {
-            self.provision_state = ProvisionState::Detached(version.clone());
-        }
-    }
+    // pub fn detach(&mut self) {
+    //     if let ProvisionState::Provisioned(version) = &self.provision_state {
+    //         self.provision_state = ProvisionState::Detached(version.clone());
+    //     }
+    // }
 
-    pub fn attach(&mut self) {
-        if let ProvisionState::Detached(version) = &self.provision_state {
-            self.provision_state = ProvisionState::Provisioned(version.clone());
-        }
-    }
+    // pub fn attach(&mut self) {
+    //     if let ProvisionState::Detached(version) = &self.provision_state {
+    //         self.provision_state = ProvisionState::Provisioned(version.clone());
+    //     }
+    // }
 
     pub fn ping(&mut self) {
         self.last_ping = Zoned::now();
@@ -186,47 +187,38 @@ impl Host {
     //     }
     // }
 
-    #[must_use]
-    pub fn is_detached(&self) -> bool {
-        match self.provision_state {
-            ProvisionState::NotSet | ProvisionState::Provisioned(_) => false,
-            ProvisionState::Detached(_) => true,
-        }
-    }
+    // #[must_use]
+    // pub fn is_detached(&self) -> bool {
+    //     match self.provision_state {
+    //         ProvisionState::NotSet | ProvisionState::Provisioned(_) => false,
+    //         ProvisionState::Detached(_) => true,
+    //     }
+    // }
 
-    #[must_use]
-    pub fn is_provisioned(&self) -> bool {
-        match self.provision_state {
-            ProvisionState::Provisioned(_) => true,
-            ProvisionState::NotSet | ProvisionState::Detached(_) => false,
-        }
-    }
+    // #[must_use]
+    // pub fn is_provisioned(&self) -> bool {
+    //     match self.provision_state {
+    //         ProvisionState::Provisioned(_) => true,
+    //         ProvisionState::NotSet | ProvisionState::Detached(_) => false,
+    //     }
+    // }
 
-    #[must_use]
-    pub fn is_notset(&self) -> bool {
-        match self.provision_state {
-            ProvisionState::Provisioned(_) | ProvisionState::Detached(_) => false,
-            ProvisionState::NotSet => true,
-        }
-    }
+    // #[must_use]
+    // pub fn is_notset(&self) -> bool {
+    //     match self.provision_state {
+    //         ProvisionState::Provisioned(_) | ProvisionState::Detached(_) => false,
+    //         ProvisionState::NotSet => true,
+    //     }
+    // }
 }
 
 // State the Server wants the client to be in
 #[expect(clippy::exhaustive_structs)]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, sqlx::Type)]
 pub enum ProvisionState {
     NotSet,
-    Detached(RemoteStorePath),
-    Provisioned(RemoteStorePath),
-}
-
-impl ProvisionState {
-    pub fn store_path(&self) -> Option<&StorePath> {
-        match self {
-            ProvisionState::Provisioned(remote_store_path) => Some(&remote_store_path.store_path),
-            _ => None,
-        }
-    }
+    Detached,
+    Provisioned,
 }
 
 impl Default for ProvisionState {

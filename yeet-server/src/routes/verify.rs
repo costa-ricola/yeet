@@ -92,9 +92,20 @@ mod test_verification {
 
         assert_eq!(facter, Some("hi".to_owned()));
 
-        let host = db::hosts::hostname_by_verify_key(&mut conn, VerifyingKey::default())
+        let host = {
+            let key = VerifyingKey::default();
+            let key = &key.as_bytes()[..];
+            sqlx::query_scalar!(
+                r#"
+            SELECT hostname FROM hosts
+            LEFT JOIN keys on hosts.key_id = keys.id
+            WHERE verifying_key = $1"#,
+                key
+            )
+            .fetch_optional(&mut *conn)
             .await
-            .unwrap();
+            .unwrap()
+        };
 
         assert_eq!(host, Some("myhost".to_owned()));
     }

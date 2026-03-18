@@ -5863,7 +5863,6 @@ dependencies = [
  "jiff-sqlx",
  "memmap2",
  "mime",
- "parking_lot",
  "paste",
  "rand 0.10.0",
  "serde",

@@ -19,13 +19,12 @@ mod error;
 mod httpsig;
 mod state;
 mod routes {
-    //     pub mod detach;
+    // pub(crate) mod detach;
     pub(crate) mod host;
     pub(crate) mod key;
     pub(crate) mod secret;
-    //     pub mod status;
-    //     pub mod system_check;
-    //     pub mod update;
+    pub(crate) mod system_check;
+    pub(crate) mod update;
     pub(crate) mod verify;
 }
 pub use routes::*;
@@ -118,14 +117,12 @@ fn routes(state: YeetState) -> Router {
         // === Hosts
         .route("/host/list", get(host::list))
         .route("/host/{id}/rename/{name}", put(host::rename_host))
-        // ===
-        // .route("/system/check", post(system_check)) // locked
-        // .route("/system/update", post(update_hosts))
-        // .route("/status/host_by_key", get(status::hosts_by_key))
-        // .route("/system/detach", post(detach::detach_host))
-        // .route("/system/detach/permission", get(detach::is_detach_allowed))
-        // .route("/detach/permission", post(detach::set_detach_permission))
-        // .route("/detach/permission", get(detach::is_detach_global_allowed))
+        // === Detach
+        // .route("/system/self/detach", put(detach::detach))
+        // // .route("/system/self/attach", put(detach::attach))
+        // === System
+        .route("/system/check", post(system_check::system_check)) // locked
+        .route("/system/update", post(update::update_hosts))
         .with_state(state)
 }
 

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use axum::{extract::State, http::StatusCode};
-use parking_lot::RwLock;
 
 use crate::{
-    AppState,
+    YeetState, db,
+    error::{BadRequest, InternalError as _},
     httpsig::{HttpSig, VerifiedJson},
     state::StateError,
 };
@@ -14,20 +14,22 @@ use crate::{
 /// The update consist of a simple `key` -> `version` and a `substitutor` which is where the agent should get its update
 /// This means that for each origin e.g. cachix, you need to call update seperately
 pub async fn update_hosts(
-    State(state): State<Arc<RwLock<AppState>>>,
-    HttpSig(http_key): HttpSig,
+    State(state): State<YeetState>,
+    HttpSig(key): HttpSig,
 
     VerifiedJson(api::HostUpdateRequest {
         hosts,
         public_key,
         substitutor,
     }): VerifiedJson<api::HostUpdateRequest>,
-) -> Result<StatusCode, StateError> {
-    let mut state = state.write_arc();
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut conn = state.pool.acquire().await.internal_server()?;
 
-    state.auth_build(&http_key)?;
+    db::keys::auth_build(&mut conn, key).await?;
 
-    state.update_hosts(hosts, public_key, substitutor);
+    db::hosts::update(&mut conn, hosts.iter(), public_key, substitutor)
+        .await
+        .bad_request()?;
 
     Ok(StatusCode::CREATED)
 }
