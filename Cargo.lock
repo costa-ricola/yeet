@@ -5824,7 +5824,7 @@ checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yeet"
-version = "0.7.0-beta.3"
+version = "0.8.0-beta.1"
 dependencies = [
  "age",
  "backon",
@@ -5862,7 +5862,7 @@ dependencies = [
 
 [[package]]
 name = "yeet-api"
-version = "0.1.0"
+version = "0.8.0-beta.1"
 dependencies = [
  "age",
  "ahash",
@@ -5885,7 +5885,7 @@ dependencies = [
 
 [[package]]
 name = "yeetd"
-version = "0.4.2"
+version = "0.8.0-beta.1"
 dependencies = [
  "age",
  "axum 0.8.8",
