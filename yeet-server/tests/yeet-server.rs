@@ -1,6 +1,7 @@
-use std::{collections::HashMap, str::FromStr};
-
+#[cfg(feature = "test-server")]
 use ed25519_dalek::SigningKey;
+#[cfg(feature = "test-server")]
+use std::{collections::HashMap, str::FromStr};
 
 #[sqlx::test]
 #[cfg(feature = "test-server")]
@@ -13,7 +14,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
     // The first thing a new host does is to create a verification attempt
     let code: i64 = server
         .post("/verification/add")
-        .json(&api::verify::VerificationAttempt {
+        .json(&api::VerificationAttempt {
             key: new_host.verifying_key(),
             nixos_facter: Some("Just some facts about a host".into()),
         })
@@ -32,7 +33,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
     assert_eq!(facter, Some("Just some facts about a host".into()));
 
     // Now that we have a host we may want to list it
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(
         hosts.first().unwrap().hostname,
         "mysuperhostname".to_owned()
@@ -51,7 +52,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
         })
         .await;
     // Now it should be provisioned and have an latest_update. no latest_version tough
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
 
     assert_eq!(
         hosts.first().unwrap().state,
@@ -87,7 +88,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
     );
 
     // If we do not udpate yet but look at the host we see that he has now an latest version
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(hosts.first().unwrap().version, Some("myoldversion".into()));
 
     // The agent now signals the server that he has done the update
@@ -106,7 +107,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
     assert_eq!(action, api::AgentAction::Nothing);
 
     // The server reflects the update
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(
         hosts.first().unwrap().version,
         Some("mysuperversion".into())
@@ -119,7 +120,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
             hosts.first().unwrap().id
         ))
         .await;
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(hosts.first().unwrap().hostname, "mynewname".to_owned());
 
     // The agent now decide he no longer wants to listen to the server and detaches
@@ -131,7 +132,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
         )
         .await;
     // This is shown as state: Detach
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(hosts.first().unwrap().state, api::ProvisionState::Detached);
 
     // And as `AgentAction::Detach`
@@ -149,7 +150,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
     assert_eq!(action, api::AgentAction::Detach);
 
     // But the version information is still logged
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(
         hosts.first().unwrap().version,
         Some("mydetachedversion".into())
@@ -164,7 +165,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
             substitutor: "mycache".into(),
         })
         .await;
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(hosts.first().unwrap().state, api::ProvisionState::Detached);
 
     // Ok but now stop fooling around and attach again
@@ -177,7 +178,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
         .await;
 
     // The agent is managed again
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(
         hosts.first().unwrap().state,
         api::ProvisionState::Provisioned
@@ -218,7 +219,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
         .json();
     assert_eq!(action, api::AgentAction::Nothing);
     // make sure the server tells the same story
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     assert_eq!(hosts.first().unwrap().version, Some("mynewversion".into()));
 
     // Ok now maybe we want to create a secret for the host
@@ -254,7 +255,7 @@ fn server_e2e_with_secret(pool: sqlx::SqlitePool) {
     assert_eq!(secret.name, "mysecret".to_owned());
 
     // and hosts
-    let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+    let hosts: Vec<api::Host> = server.get("/host/list").await.json();
     let host = hosts.first().unwrap();
     assert_eq!(host.hostname, "mynewname".to_owned());
 

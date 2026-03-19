@@ -183,7 +183,7 @@ pub async fn update(
     Ok(())
 }
 
-pub async fn list(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::host::Host>, sqlx::Error> {
+pub async fn list(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::Host>, sqlx::Error> {
     Ok(sqlx::query!(
         r#"
         WITH current_state AS (
@@ -216,7 +216,7 @@ pub async fn list(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::host::Ho
         LEFT JOIN latest_update_request lur ON lur.host_id = h.id AND lur.rn = 1;
         "#
     )
-    .map(|r| api::host::Host {
+    .map(|r| api::Host {
         id: api::HostID::new(r.id),
         hostname: r.hostname,
         key: VerifyingKey::from_bytes(

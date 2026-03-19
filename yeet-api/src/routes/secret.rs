@@ -1,4 +1,14 @@
+use std::collections::HashMap;
+
+use http::StatusCode;
+use httpsig_hyper::prelude::*;
 use serde::{Deserialize, Serialize};
+use url::Url;
+
+use crate::{
+    HostID,
+    httpsig::{ErrorForJson as _, ReqwestSig, ResponseError, sig_param},
+};
 
 #[derive(Clone, Copy, Debug, sqlx::Type, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[sqlx(transparent)]
@@ -28,4 +38,154 @@ pub struct SecretName {
 pub struct GetSecretRequest {
     pub recipient: String,
     pub secret: String,
+}
+
+pub async fn add_secret<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    name: &str,
+    secret: &[u8],
+) -> Result<SecretID, ResponseError> {
+    reqwest::Client::new()
+        .post(url.join(&format!("/secret/add/{name}"))?)
+        .json(secret)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_json()
+        .await
+}
+
+pub async fn rename_secret<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    id: SecretID,
+    new_name: &str,
+) -> Result<StatusCode, ResponseError> {
+    reqwest::Client::new()
+        .put(url.join(&format!("/secret/{id}/rename/{new_name}"))?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_code()
+        .await
+}
+
+pub async fn delete_secret<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    id: SecretID,
+) -> Result<StatusCode, ResponseError> {
+    reqwest::Client::new()
+        .delete(url.join(&format!("/secret/{id}/delete"))?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_code()
+        .await
+}
+
+pub async fn allow_host<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    secret: SecretID,
+    host: HostID,
+) -> Result<StatusCode, ResponseError> {
+    reqwest::Client::new()
+        .put(url.join(&format!("/secret/{secret}/allow/{host}"))?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_code()
+        .await
+}
+
+pub async fn block_host<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    secret: SecretID,
+    host: HostID,
+) -> Result<StatusCode, ResponseError> {
+    reqwest::Client::new()
+        .put(url.join(&format!("/secret/{secret}/block/{host}"))?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_code()
+        .await
+}
+
+pub async fn list_secrets<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+) -> Result<Vec<SecretName>, ResponseError> {
+    reqwest::Client::new()
+        .get(url.join("/secret/list")?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_json()
+        .await
+}
+
+pub async fn secret_acl<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+) -> Result<HashMap<SecretID, Vec<HostID>>, ResponseError> {
+    reqwest::Client::new()
+        .get(url.join("/secret/acl")?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_json()
+        .await
+}
+
+pub async fn server_age_key<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+) -> Result<String, ResponseError> {
+    reqwest::Client::new()
+        .get(url.join("/secret/server_key")?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_json()
+        .await
+}
+
+pub async fn get_secret<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    name: String,
+) -> Result<Option<Vec<u8>>, ResponseError> {
+    let identity = age::x25519::Identity::generate();
+    let request = GetSecretRequest {
+        recipient: identity.to_public().to_string(),
+        secret: name,
+    };
+
+    let response = reqwest::Client::new()
+        .post(url.join("/secret")?)
+        .json(&request)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_json::<Option<Vec<u8>>>()
+        .await?;
+
+    if let Some(ciphertext) = response {
+        Ok(Some(age::decrypt(&identity, &ciphertext)?))
+    } else {
+        Ok(None)
+    }
 }

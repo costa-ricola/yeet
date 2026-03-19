@@ -1,12 +1,9 @@
-use std::sync::Arc;
-
 use axum::{Json, extract::State, http::StatusCode};
 
 use crate::{
     YeetState, db,
     error::InternalError as _,
     httpsig::{HttpSig, VerifiedJson},
-    state::StateError,
 };
 
 /// This is the "ping" command every client should send in a specific interval.

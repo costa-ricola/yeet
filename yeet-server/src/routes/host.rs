@@ -13,7 +13,7 @@ use crate::{
 pub async fn list(
     State(state): State<YeetState>,
     HttpSig(key): HttpSig,
-) -> Result<Json<Vec<api::host::Host>>, (StatusCode, String)> {
+) -> Result<Json<Vec<api::Host>>, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
     db::keys::auth_admin(&mut conn, key).await?;
     Ok(Json(db::hosts::list(&mut conn).await.internal_server()?))
@@ -67,7 +67,7 @@ mod test_host {
     async fn add_host(server: &TestServer) {
         let code: i64 = server
             .post("/verification/add")
-            .json(&api::verify::VerificationAttempt {
+            .json(&api::VerificationAttempt {
                 key: VerifyingKey::default(),
                 nixos_facter: Some("hi".to_owned()),
             })
@@ -90,11 +90,11 @@ mod test_host {
 
         add_host(&server).await;
 
-        let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+        let hosts: Vec<api::Host> = server.get("/host/list").await.json();
 
         assert_eq!(
             hosts,
-            vec![api::host::Host {
+            vec![api::Host {
                 id: api::HostID::new(1),
                 key: VerifyingKey::default(),
                 hostname: "myhost".to_owned(),
@@ -114,11 +114,11 @@ mod test_host {
 
         server.put("/host/1/rename/otherhost").await;
 
-        let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+        let hosts: Vec<api::Host> = server.get("/host/list").await.json();
 
         assert_eq!(
             hosts,
-            vec![api::host::Host {
+            vec![api::Host {
                 id: api::HostID::new(1),
                 key: VerifyingKey::default(),
                 hostname: "otherhost".to_owned(),
@@ -141,7 +141,7 @@ mod test_host {
             .json(&VerifyingKey::default())
             .await;
 
-        let hosts: Vec<api::host::Host> = server.get("/host/list").await.json();
+        let hosts: Vec<api::Host> = server.get("/host/list").await.json();
 
         assert_eq!(hosts, vec![]);
     }

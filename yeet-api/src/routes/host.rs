@@ -1,10 +1,15 @@
-use std::path::Display;
+use std::collections::HashMap;
 
 use ed25519_dalek::VerifyingKey;
-use jiff::Zoned;
+
+use http::StatusCode;
+use httpsig_hyper::prelude::SigningKey;
+use url::Url;
+
+use crate::httpsig::{ErrorForJson as _, ReqwestSig, ResponseError, sig_param};
 use serde::{Deserialize, Serialize};
 
-use crate::{ProvisionState, StorePath};
+use crate::StorePath;
 
 #[derive(Clone, Copy, Debug, sqlx::Type, Deserialize, Serialize, PartialEq, Eq)]
 #[sqlx(transparent)]
@@ -21,6 +26,21 @@ impl std::fmt::Display for HostID {
 impl HostID {
     pub fn new(id: i64) -> Self {
         Self(id)
+    }
+}
+
+// State the Server wants the client to be in
+#[expect(clippy::exhaustive_structs)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, sqlx::Type)]
+pub enum ProvisionState {
+    NotSet,
+    Detached,
+    Provisioned,
+}
+impl Default for ProvisionState {
+    #[inline]
+    fn default() -> Self {
+        Self::NotSet
     }
 }
 
@@ -47,3 +67,66 @@ impl PartialEq for Host {
     }
 }
 impl Eq for Host {}
+
+pub async fn list_hosts<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+) -> Result<Vec<Host>, ResponseError> {
+    reqwest::Client::new()
+        .get(url.join("/host/list")?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_json()
+        .await
+}
+
+pub async fn rename_host<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    host: HostID,
+    new_name: String,
+) -> Result<StatusCode, ResponseError> {
+    reqwest::Client::new()
+        .put(url.join(&format!("/host/{host}/rename/{new_name}"))?)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_code()
+        .await
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Represents a Host Update Request
+/// The Agent uses the substitutor to fetch the update via nix
+#[expect(
+    clippy::exhaustive_structs,
+    reason = "API Structs should be breaking change"
+)]
+// TODO: Split into remote lookup
+pub struct HostUpdateRequest {
+    /// The hosts to update identified by their name
+    pub hosts: HashMap<String, StorePath>,
+    /// The public key the agent should use to verify the update
+    pub public_key: String,
+    /// The substitutor the agent should use to fetch the update
+    pub substitutor: String,
+}
+
+pub async fn update_hosts<K: SigningKey + Sync>(
+    url: &Url,
+    key: &K,
+    update: &HostUpdateRequest,
+) -> Result<StatusCode, ResponseError> {
+    reqwest::Client::new()
+        .post(url.join("/host/update")?)
+        .json(update)
+        .sign(&sig_param(key)?, key)
+        .await?
+        .send()
+        .await?
+        .error_for_code()
+        .await
+}

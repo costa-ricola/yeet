@@ -26,11 +26,11 @@ mime = "0.3"
 # rand_core = { version = "0.6", features = ["std" ,] }
 axum_thiserror = "0.1.0"
 rand = "0.10"
-age = { version = "0.11.2", features = [] }
 curve25519-dalek = "4.1.3"
 axum-test = {version = "19.1", optional = true}
 
 
+age.workspace = true
 httpsig-hyper.workspace = true
 jiff.workspace = true
 serde.workspace = true
@@ -40,7 +40,7 @@ serde_json_any_key.workspace = true
 jiff-sqlx = { version = "0.1.1", features = ["sqlite"] }
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
 futures = "0.3.32"
-error_set = "0.9.1"
+error_set.workspace = true
 
 [dev-dependencies]
 paste = "1.0"

@@ -28,7 +28,7 @@ pub async fn is_host_verified(HttpSig(_http_key): HttpSig) -> StatusCode {
 /// Adds a new key as an verification attempt
 pub async fn add_verification_attempt(
     State(state): State<YeetState>,
-    Json(attempt): Json<api::verify::VerificationAttempt>,
+    Json(attempt): Json<api::VerificationAttempt>,
 ) -> Result<Json<i64>, (StatusCode, String)> {
     // TODO: check if httsig is correct so that non key owners can not send verification attempts
     // Altough this is not a security risk because even if you create an foreign attempt still only the key holder get authorized
@@ -62,11 +62,9 @@ pub async fn accept_attempt(
 
 #[cfg(test)]
 mod test_verification {
-    use api::verify::VerificationAttempt;
+    use api::VerificationAttempt;
     use ed25519_dalek::{SigningKey, VerifyingKey};
     use rand::random;
-
-    use crate::db;
 
     #[sqlx::test]
     async fn add_and_accept(pool: sqlx::SqlitePool) {

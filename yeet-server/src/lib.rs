@@ -34,6 +34,7 @@ pub fn routes(state: YeetState) -> axum::Router {
         .route("/verification/add", post(verify::add_verification_attempt))
         .route("/verification/{id}/accept", put(verify::accept_attempt))
         .route("/verification/check", get(verify::is_host_verified))
+        .route("/system/verify", get(verify::is_host_verified)) // legacy
         // === Secrets
         .route("/secret/add/{name}", post(secret::add_secret))
         .route(
