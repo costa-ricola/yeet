@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 use axum::{
     Json,
@@ -18,7 +18,7 @@ pub async fn add_secret(
     HttpSig(key): HttpSig,
     Path(name): Path<String>,
     VerifiedJson(secret): VerifiedJson<Vec<u8>>,
-) -> Result<Json<api::SecretID>, (StatusCode, String)> {
+) -> Result<Json<api::SecretName>, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
     db::keys::auth_admin(&mut conn, key).await?;
 
@@ -84,10 +84,10 @@ pub async fn block_host(
     Ok(StatusCode::OK)
 }
 
-pub async fn get_all_acl(
+pub async fn list_acl(
     State(state): State<YeetState>,
     HttpSig(key): HttpSig,
-) -> Result<Json<HashMap<api::SecretID, Vec<api::HostID>>>, (StatusCode, String)> {
+) -> Result<Json<Vec<(api::SecretName, Vec<api::HostID>)>>, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
     db::keys::auth_admin(&mut conn, key).await?;
     Ok(Json(db::secrets::list_acl(&mut conn).await.bad_request()?))
@@ -161,13 +161,13 @@ mod test_secret {
 
         let secret = age::encrypt(&recipient, b"plaintext").unwrap();
 
-        let id: api::SecretID = server
+        let id: api::SecretName = server
             .post("/secret/add/secretstuff")
             .json(&secret)
             .await
             .json();
 
-        server.put(&format!("/secret/{id}/allow/1")).await;
+        server.put(&format!("/secret/{}/allow/1", id.id)).await;
 
         let secret: Option<Vec<u8>> = server
             .post("/secret")
@@ -196,15 +196,17 @@ mod test_secret {
 
         let secret = age::encrypt(&recipient, b"plaintext").unwrap();
 
-        let id: api::SecretID = server
+        let id: api::SecretName = server
             .post("/secret/add/secretstuff")
             .json(&secret)
             .await
             .json();
 
-        server.put(&format!("/secret/{id}/allow/1")).await;
+        server.put(&format!("/secret/{}/allow/1", id.id)).await;
 
-        server.put(&format!("/secret/{id}/rename/mynewname")).await;
+        server
+            .put(&format!("/secret/{}/rename/mynewname", id.id))
+            .await;
 
         let secret: Option<Vec<u8>> = server
             .post("/secret")
@@ -242,13 +244,13 @@ mod test_secret {
 
         let secret = age::encrypt(&recipient, b"plaintext").unwrap();
 
-        let id: api::SecretID = server
+        let id: api::SecretName = server
             .post("/secret/add/secretstuff")
             .json(&secret)
             .await
             .json();
 
-        server.delete(&format!("/secret/{id}/delete")).await;
+        server.delete(&format!("/secret/{}/delete", id.id)).await;
 
         let secret: Option<Vec<u8>> = server
             .post("/secret")
@@ -277,7 +279,7 @@ mod test_secret {
 
         let secret = age::encrypt(&recipient, b"plaintext").unwrap();
 
-        let _id: api::SecretID = server
+        let _id: api::SecretName = server
             .post("/secret/add/secretstuff")
             .json(&secret)
             .await
@@ -309,7 +311,7 @@ mod test_secret {
 
         let secret = age::encrypt(&recipient, b"plaintext").unwrap();
 
-        let id: api::SecretID = server
+        let id: api::SecretName = server
             .post("/secret/add/secretstuff")
             .json(&secret)
             .await
@@ -317,13 +319,7 @@ mod test_secret {
 
         let secrets: Vec<api::SecretName> = server.get("/secret/list").await.json();
 
-        assert_eq!(
-            secrets,
-            vec![api::SecretName {
-                id,
-                name: "secretstuff".to_owned()
-            }]
-        );
+        assert_eq!(secrets, vec![id]);
     }
 
     #[sqlx::test]
@@ -339,17 +335,17 @@ mod test_secret {
 
         let secret = age::encrypt(&recipient, b"plaintext").unwrap();
 
-        let id: api::SecretID = server
+        let id: api::SecretName = server
             .post("/secret/add/secretstuff")
             .json(&secret)
             .await
             .json();
 
-        server.put(&format!("/secret/{id}/allow/1")).await;
+        server.put(&format!("/secret/{}/allow/1", id.id)).await;
 
-        let acl: HashMap<api::SecretID, Vec<api::HostID>> = server.get("/secret/acl").await.json();
+        let acl: Vec<(api::SecretName, Vec<api::HostID>)> = server.get("/secret/acl").await.json();
 
-        assert_eq!(acl.get(&id).unwrap(), &vec![api::HostID::new(1)])
+        assert_eq!(acl.get(0).unwrap().1, vec![api::HostID::new(1)])
     }
 
     #[sqlx::test]

@@ -77,7 +77,7 @@ fn routes(state: YeetState) -> axum::Router {
         .route("/secret/{id}/rename/{name}", put(secret::rename_secret))
         .route("/secret/{id}/delete", delete(secret::delete_secret))
         .route("/secret/list", get(secret::list))
-        .route("/secret/acl", get(secret::get_all_acl))
+        .route("/secret/acl", get(secret::list_acl))
         .route("/secret/server_key", get(secret::get_server_age_key)) // locked
         .route("/secret", post(secret::get_secret)) // locked
         // === Keys

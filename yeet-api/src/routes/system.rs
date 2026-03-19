@@ -44,7 +44,7 @@ pub struct RemoteStorePath {
     pub substitutor: String,
 }
 
-pub async fn detach_system<K: SigningKey + Sync>(
+pub async fn detach_self<K: SigningKey + Sync>(
     url: &Url,
     key: &K,
 ) -> Result<StatusCode, ResponseError> {
@@ -58,7 +58,7 @@ pub async fn detach_system<K: SigningKey + Sync>(
         .await
 }
 
-pub async fn attach_system<K: SigningKey + Sync>(
+pub async fn attach_self<K: SigningKey + Sync>(
     url: &Url,
     key: &K,
 ) -> Result<StatusCode, ResponseError> {

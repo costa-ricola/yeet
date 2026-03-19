@@ -142,7 +142,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
 
     // The agent now decide he no longer wants to listen to the server and detaches
 
-    api::detach_system(&url, &client_key).await.unwrap();
+    api::detach_self(&url, &client_key).await.unwrap();
 
     // This is shown as state: Detach
     let hosts = api::list_hosts(&url, &key).await.unwrap();
@@ -184,7 +184,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     assert_eq!(hosts.first().unwrap().state, api::ProvisionState::Detached);
 
     // Ok but now stop fooling around and attach again
-    api::attach_system(&url, &client_key).await.unwrap();
+    api::attach_self(&url, &client_key).await.unwrap();
 
     // The agent is managed again
     let hosts = api::list_hosts(&url, &key).await.unwrap();

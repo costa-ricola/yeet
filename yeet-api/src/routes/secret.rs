@@ -29,10 +29,16 @@ impl SecretID {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Hash)]
 pub struct SecretName {
     pub id: SecretID,
     pub name: String,
+}
+
+impl std::fmt::Display for SecretName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -46,7 +52,7 @@ pub async fn add_secret<K: SigningKey + Sync>(
     key: &K,
     name: &str,
     secret: &[u8],
-) -> Result<SecretID, ResponseError> {
+) -> Result<SecretName, ResponseError> {
     reqwest::Client::new()
         .post(url.join(&format!("/secret/add/{name}"))?)
         .json(secret)
@@ -135,10 +141,10 @@ pub async fn list_secrets<K: SigningKey + Sync>(
         .await
 }
 
-pub async fn secret_acl<K: SigningKey + Sync>(
+pub async fn list_secret_acl<K: SigningKey + Sync>(
     url: &Url,
     key: &K,
-) -> Result<HashMap<SecretID, Vec<HostID>>, ResponseError> {
+) -> Result<Vec<(SecretName, Vec<HostID>)>, ResponseError> {
     reqwest::Client::new()
         .get(url.join("/secret/acl")?)
         .sign(&sig_param(key)?, key)

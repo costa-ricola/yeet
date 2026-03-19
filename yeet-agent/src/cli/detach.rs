@@ -3,13 +3,12 @@ use std::path::PathBuf;
 use yeet::nix;
 
 use log::info;
-use rootcause::{Report, bail, report};
+use rootcause::{Report, report};
 
 use crate::varlink;
 
 pub async fn detach(
     version: Option<api::StorePath>,
-    force: bool,
     path: PathBuf,
     darwin: bool,
 ) -> Result<(), Report> {
@@ -41,7 +40,7 @@ pub async fn detach(
     info!("Build done. Connecting to yeet agent");
 
     // The rest is error handling
-    match varlink::detach(revision, force).await {
+    match varlink::detach(revision).await {
         Ok(_) => {
             info!("Detached successfully")
         }
@@ -49,9 +48,9 @@ pub async fn detach(
             return Err(report.into());
         }
         Err(varlink::Error::DaemonError(err)) => match err {
-            YeetDaemonError::NoConnectionToServer { report } => {
+            YeetDaemonError::NoConnectionToServer { error } => {
                 return Err(report!("Could not connect to yeet server")
-                    .context(report)
+                    .context(error)
                     .into_dynamic());
             }
             YeetDaemonError::CredentialError { error } => {
@@ -64,13 +63,6 @@ pub async fn detach(
                     .context(error)
                     .into_dynamic());
             }
-            YeetDaemonError::PolkitDetachNoPermission => {
-                bail!("Polkit did not authenticate successfully")
-            }
-            YeetDaemonError::ServerDetachNoPermission => bail!(
-                "You have no permission to detach. If you want to ignore this you can use `--force`
-                Make sure you understand the consequences before doing so."
-            ),
             YeetDaemonError::NoCurrentSystem => unreachable!(),
         },
     }

@@ -1,5 +1,5 @@
 use console::style;
-use jiff::{Unit, Zoned};
+use jiff::{Timestamp, Unit, Zoned};
 use similar::{ChangeTag, DiffOp, TextDiff};
 
 // pub trait Fragment {
@@ -11,18 +11,18 @@ use similar::{ChangeTag, DiffOp, TextDiff};
 //     }
 // }
 
-pub fn time_diff(zoned: &Zoned, unit: Unit, threshold: f64, smallest: Unit) -> String {
-    let span = (zoned - &jiff::Zoned::now())
+pub fn time_diff(timestamp: Timestamp, unit: Unit, threshold: f64, smallest: Unit) -> String {
+    let span = (timestamp - jiff::Timestamp::now())
         .round(
             jiff::SpanRound::new()
                 .largest(jiff::Unit::Month)
                 .smallest(smallest)
-                .relative(zoned)
+                .relative(&Zoned::now())
                 .mode(jiff::RoundMode::Trunc),
         )
         .unwrap();
 
-    if span.total((unit, zoned)).unwrap().abs() < threshold {
+    if span.total((unit, &Zoned::now())).unwrap().abs() < threshold {
         style(format!("{span:#}")).green().bold()
     } else {
         style(format!("{span:#}")).red().bold()

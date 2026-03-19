@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use api::key::{get_secret_key, get_verify_key};
+use api::{get_secret_key, get_verify_key};
 use backon::{ConstantBuilder, Retryable as _};
 use ed25519_dalek::VerifyingKey;
 use httpsig_hyper::prelude::SecretKey;
@@ -20,7 +20,7 @@ use rootcause::{Report, bail, prelude::ResultExt as _, report};
 use tempfile::NamedTempFile;
 use tokio::time;
 use url::Url;
-use yeet::{nix, server};
+use yeet::nix;
 
 use crate::{cli_args::AgentConfig, notification, varlink, version::get_active_version};
 
@@ -68,7 +68,7 @@ async fn agent_loop(
     sleep: u64,
     facter: bool,
 ) -> Result<(), Report> {
-    let verified = server::system::is_host_verified(&config.server, key) //TODO unwrap
+    let verified = api::is_host_verified(&config.server, key) //TODO unwrap
         .await?
         .is_success();
 
@@ -86,23 +86,22 @@ async fn agent_loop(
             None
         };
 
-        let code = server::system::add_verification_attempt(
+        let code = api::add_verification_attempt(
             &config.server,
             &api::VerificationAttempt {
                 key: pub_key,
-                store_path: get_active_version()?,
-                artifacts: api::VerificationArtifacts { nixos_facter },
+                nixos_facter,
             },
         )
         .await?;
-        let _ = VERIFICATION_CODE.set(code);
+        let _ = VERIFICATION_CODE.set(code as u32);
         info!("Your verification code is: {code}");
         bail!("Waiting for verification");
     }
     info!("Verified!");
 
     loop {
-        let action = server::system::check(
+        let action = api::check_system(
             &config.server,
             key,
             &api::VersionRequest {
@@ -226,7 +225,7 @@ async fn download(
     // Even if we do not end up using the temp file we create it outside of the if scope.
     // Else it would get dropped before nix-store can use it
     let mut netrc_file = NamedTempFile::new().context("Could not create netrc temp file")?;
-    let netrc = match server::secret::get_secret(url, key, "netrc").await {
+    let netrc = match api::get_secret(url, key, "netrc".into()).await {
         Ok(secret) => secret,
         Err(err) => {
             log::error!("could not get netrc secret: {err}");
@@ -285,7 +284,7 @@ async fn get_secrets(
     let mut secrets = Vec::new();
     for (secret, definition) in nix_secrets {
         log::info!("Fetching secret {secret}");
-        let Some(secret) = server::secret::get_secret(url, key, &secret).await? else {
+        let Some(secret) = api::get_secret(url, key, secret.clone()).await? else {
             rootcause::bail!("Secret {secret} not found! Unable to switch to derivation");
         };
         secrets.push((definition, secret));

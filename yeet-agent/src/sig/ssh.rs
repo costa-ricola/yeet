@@ -69,17 +69,17 @@ fn key_from_ssh_config(url: impl AsRef<str>) -> Result<SecretKey, Report> {
         identity_files.pop().unwrap()
     };
 
-    Ok(api::key::get_secret_key(identity_file)?)
+    Ok(api::get_secret_key(identity_file)?)
 }
 
 pub fn get_key_manual() -> Result<SecretKey, Report> {
     let key = inquire::Text::new("Yeet Admin Key:")
         .with_validator(|path: &str| {
-            Ok(match api::key::get_secret_key(path) {
+            Ok(match api::get_secret_key(path) {
                 Ok(_) => Validation::Valid,
                 Err(err) => Validation::Invalid(format!("Not a valid secret key: {err}").into()),
             })
         })
         .prompt()?;
-    Ok(api::key::get_secret_key(key)?)
+    Ok(api::get_secret_key(key)?)
 }

@@ -73,19 +73,15 @@ async fn main() -> Result<(), Report> {
         Commands::Secret(args) => cli::secret::handle_secret_command(args, &config).await?,
         Commands::Detach {
             version,
-            force,
+
             darwin,
             path,
-        } => cli::detach::detach(version, force, path, darwin).await?,
+        } => cli::detach::detach(version, path, darwin).await?,
         Commands::Attach => cli::detach::attach().await?,
-        Commands::Approve { name, code, facter } => {
-            cli::approve::approve(&config, facter, code, name).await?
-        }
+        Commands::Approve => cli::approve::approve(&config).await?,
         Commands::Host(HostArgs { command }) => match command {
-            cli_args::HostCommands::Rename { name, new } => {
-                cli::host::rename(&config, name, new).await?
-            }
-            cli_args::HostCommands::Remove { name } => cli::host::remove(&config, name).await?,
+            cli_args::HostCommands::Rename => cli::host::rename(&config).await?,
+            cli_args::HostCommands::Remove => cli::host::remove(&config).await?,
         },
         Commands::Hosts { full } => cli::hosts::hosts(&config, full).await?,
         Commands::Notify => notification::notify()?,

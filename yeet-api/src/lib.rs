@@ -1,8 +1,8 @@
 //! API for yeet
 
-pub mod httpsig;
-pub mod key;
-pub mod secret;
+mod httpsig;
+mod key;
+mod secret;
 
 mod routes {
     pub mod host;
@@ -12,6 +12,8 @@ mod routes {
     pub mod verify;
 }
 
+pub use httpsig::*;
+pub use key::*;
 pub use routes::host::*;
 pub use routes::key::*;
 pub use routes::secret::*;

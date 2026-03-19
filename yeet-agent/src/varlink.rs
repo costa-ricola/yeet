@@ -11,7 +11,7 @@ use rootcause::{Report, compat::ReportAsError, prelude::ResultExt};
 use serde::{Deserialize, Serialize};
 use tokio::fs::{self, remove_file};
 use url::Url;
-use yeet::server;
+
 use zlink::{Connection, ReplyError, connection::socket::FetchPeerCredentials, proxy, unix};
 
 shadow_rs::shadow!(build);
@@ -32,7 +32,6 @@ pub trait YeetProxy {
     async fn detach(
         &mut self,
         version: api::StorePath,
-        force: bool,
     ) -> zlink::Result<Result<(), YeetDaemonError>>;
     async fn attach(&mut self) -> zlink::Result<Result<(), YeetDaemonError>>;
 }
@@ -65,10 +64,10 @@ pub async fn config() -> Result<AgentConfig, Error> {
         .expect("Config can never Error because it does not return a result"))
 }
 
-pub async fn detach(version: api::StorePath, force: bool) -> Result<(), Error> {
+pub async fn detach(version: api::StorePath) -> Result<(), Error> {
     let mut client = client().await?;
     client
-        .detach(version, force)
+        .detach(version)
         .await
         .context("Could not communicate with the varlink daemon. Are you running the same version?")
         .map_err(ReportAsError::from)?
@@ -99,7 +98,7 @@ pub enum YeetDaemonError {
     NoCurrentSystem,
     /// Could not connect to the yeet-server in an operation where a server connection is required
     NoConnectionToServer {
-        report: String,
+        error: String,
     },
     CredentialError {
         error: String,
@@ -108,10 +107,6 @@ pub enum YeetDaemonError {
     PolkitError {
         error: String,
     },
-    /// Polkit authentication successfull but no permission
-    PolkitDetachNoPermission,
-    /// Detach not allowed by server. Use force=true to circumvent this
-    ServerDetachNoPermission,
 }
 
 impl From<std::io::Error> for YeetDaemonError {
@@ -129,10 +124,10 @@ impl From<PolkitError> for YeetDaemonError {
         }
     }
 }
-impl From<Report> for YeetDaemonError {
-    fn from(value: Report) -> Self {
+impl From<api::ResponseError> for YeetDaemonError {
+    fn from(value: api::ResponseError) -> Self {
         Self::NoConnectionToServer {
-            report: value.to_string(),
+            error: value.to_string(),
         }
     }
 }
@@ -152,8 +147,7 @@ where
         log::debug!("Varlink: Daemon status requested");
 
         //TODO unwrap
-        let verified = match server::system::is_host_verified(&self.config.server, &self.key).await
-        {
+        let verified = match api::is_host_verified(&self.config.server, &self.key).await {
             Ok(verified) => Some(verified.is_success()),
             Err(_) => None,
         };
@@ -163,7 +157,7 @@ where
                 return Err(YeetDaemonError::NoCurrentSystem);
             };
 
-            server::system::check(
+            api::check_system(
                 &self.config.server,
                 &self.key,
                 &api::VersionRequest { store_path },
@@ -191,16 +185,11 @@ where
             }
         };
 
-        let detach_allowed = server::system::detach_permission(&self.config.server, &self.key)
-            .await
-            .ok();
-
         Ok(DaemonStatus {
             up_to_date,
             server: self.config.server.clone(),
             mode,
             version: String::from(build::PKG_VERSION),
-            detach_allowed,
         })
     }
 
@@ -211,7 +200,6 @@ where
     pub async fn detach(
         &self,
         version: api::StorePath,
-        force: bool,
         // #[zlink(connection)] conn: &mut zlink::Connection<Sock>,
     ) -> Result<(), YeetDaemonError> {
         // {
@@ -229,23 +217,9 @@ where
         // Force switches to the revision without signaling the server
         // Meaning that once the agent gets the action to switch to the next revision this will be reverted
         // Only use force on offline clients
-        if force {
-            agent::switch_to(&version);
-        }
-
-        // Check if the server allows switching
-        let permission = server::system::detach_permission(&self.config.server, &self.key).await?;
-        if !permission {
-            return Err(YeetDaemonError::ServerDetachNoPermission);
-        }
 
         // Signal detaching to server
-        let _ = server::system::detach(
-            &self.config.server,
-            &self.key,
-            &api::DetachAction::DetachSelf,
-        )
-        .await?;
+        let _ = api::detach_self(&self.config.server, &self.key).await?;
         info!("System detached. Switching");
 
         // Switch to version
@@ -257,12 +231,7 @@ where
     }
 
     pub async fn attach(&self) -> Result<(), YeetDaemonError> {
-        let _ = server::system::detach(
-            &self.config.server,
-            &self.key,
-            &api::DetachAction::AttachSelf,
-        )
-        .await?;
+        let _ = api::attach_self(&self.config.server, &self.key).await?;
         info!("System attached");
 
         Ok(())
@@ -301,7 +270,6 @@ pub struct DaemonStatus {
     pub server: Url,
     pub mode: DaemonMode,
     pub version: String,
-    pub detach_allowed: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::StorePath;
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "hazard", derive(sqlx::Type))]
 #[cfg_attr(feature = "hazard", sqlx(transparent))]
 #[serde(transparent)]

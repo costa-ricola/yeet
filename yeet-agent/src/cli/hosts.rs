@@ -1,6 +1,5 @@
 use console::style;
 use rootcause::Report;
-use yeet::server;
 
 use crate::{
     cli::common,
@@ -14,15 +13,15 @@ pub async fn hosts(config: &Config, full: bool) -> Result<(), Report> {
     let secret_key = &ssh::key_by_url(&url)?;
 
     let hosts_section: Vec<(String, Vec<(String, String)>)> = {
-        let mut hosts = server::status(&url, secret_key).await?;
-        hosts.sort_by_key(|h| h.name.clone());
+        let mut hosts = api::list_hosts(&url, secret_key).await?;
+        hosts.sort_by_key(|h| h.hostname.clone());
 
         if full {
-            let hostnames = hosts.iter().map(|h| h.name.clone()).collect();
+            let hostnames = hosts.iter().map(|h| h.hostname.clone()).collect();
             let selected =
                 inquire::MultiSelect::new("Which hosts do you want to display>", hostnames)
                     .prompt()?;
-            hosts.retain(|h| selected.contains(&h.name));
+            hosts.retain(|h| selected.contains(&h.hostname));
         }
 
         if full {

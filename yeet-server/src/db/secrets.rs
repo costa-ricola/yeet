@@ -29,7 +29,7 @@ pub async fn add_secret<I: age::Identity, S: Into<String>, V: Into<Vec<u8>>>(
     name: S,
     secret: V,
     store_key: &I,
-) -> Result<api::SecretID, AddSecretError> {
+) -> Result<api::SecretName, AddSecretError> {
     let secret = secret.into();
     let name = name.into();
     // test if secret is decryptable
@@ -41,7 +41,10 @@ pub async fn add_secret<I: age::Identity, S: Into<String>, V: Into<Vec<u8>>>(
     )
     .execute(conn)
     .await?;
-    Ok(api::SecretID::new(row.last_insert_rowid()))
+    Ok(api::SecretName {
+        id: api::SecretID::new(row.last_insert_rowid()),
+        name,
+    })
 }
 
 error_set::error_set! {
@@ -168,20 +171,35 @@ pub async fn list_secrets(
 /// list acl
 pub async fn list_acl(
     conn: &mut sqlx::SqliteConnection,
-) -> Result<HashMap<api::SecretID, Vec<api::HostID>>, sqlx::Error> {
-    let secrets = sqlx::query!(r#"SELECT secret_id, host_id FROM secrets_acl"#)
-        .fetch(conn)
-        .map_ok(|r| (api::SecretID::new(r.secret_id), api::HostID::new(r.host_id)))
-        .try_fold(
-            HashMap::<_, Vec<_>>::new(),
-            |mut acc, (key, value)| async move {
-                acc.entry(key).or_default().push(value);
-                Ok(acc)
+) -> Result<Vec<(api::SecretName, Vec<api::HostID>)>, sqlx::Error> {
+    let secrets = sqlx::query!(
+        r#"
+        SELECT id, name, host_id
+        FROM secrets
+        LEFT JOIN secrets_acl on secrets_acl.secret_id = secrets.id"#
+    )
+    .fetch(conn)
+    .map_ok(|r| {
+        (
+            api::SecretName {
+                id: api::SecretID::new(r.id),
+                name: r.name,
             },
+            r.host_id.map(|id| api::HostID::new(id)),
         )
-        .await?;
+    })
+    .try_fold(
+        HashMap::<_, Vec<_>>::new(),
+        |mut acc, (key, value)| async move {
+            if let Some(id) = value {
+                acc.entry(key).or_default().push(id);
+            }
+            Ok(acc)
+        },
+    )
+    .await?;
 
-    Ok(secrets)
+    Ok(secrets.into_iter().collect())
 }
 
 /// Rename a secret including its acl
@@ -235,7 +253,7 @@ mod test {
             .await
             .unwrap();
 
-        db::secrets::add_access_for(&mut conn, my_secret, my_host)
+        db::secrets::add_access_for(&mut conn, my_secret.id, my_host)
             .await
             .unwrap();
 
@@ -309,7 +327,7 @@ mod test {
             .await
             .unwrap();
 
-        db::secrets::add_access_for(&mut conn, secret, my_host)
+        db::secrets::add_access_for(&mut conn, secret.id, my_host)
             .await
             .unwrap();
 
@@ -324,7 +342,7 @@ mod test {
         .unwrap()
         .unwrap();
 
-        db::secrets::remove_access_for(&mut conn, secret, my_host)
+        db::secrets::remove_access_for(&mut conn, secret.id, my_host)
             .await
             .unwrap();
 
@@ -378,32 +396,32 @@ mod test {
             .await
             .unwrap();
 
-        db::secrets::add_access_for(&mut conn, my_secret, my_host)
+        db::secrets::add_access_for(&mut conn, my_secret.id, my_host)
             .await
             .unwrap();
 
-        db::secrets::add_access_for(&mut conn, secret2, my_host)
+        db::secrets::add_access_for(&mut conn, secret2.id, my_host)
             .await
             .unwrap();
 
-        db::secrets::add_access_for(&mut conn, secret2, h2)
+        db::secrets::add_access_for(&mut conn, secret2.id, h2)
             .await
             .unwrap();
 
         assert!(
-            db::secrets::check_acl(&mut conn, my_secret, my_host)
+            db::secrets::check_acl(&mut conn, my_secret.id, my_host)
                 .await
                 .unwrap()
         );
 
         assert!(
-            db::secrets::check_acl(&mut conn, secret2, my_host)
+            db::secrets::check_acl(&mut conn, secret2.id, my_host)
                 .await
                 .unwrap()
         );
 
         assert!(
-            db::secrets::check_acl(&mut conn, secret2, h2)
+            db::secrets::check_acl(&mut conn, secret2.id, h2)
                 .await
                 .unwrap()
         );
@@ -440,7 +458,7 @@ mod test {
             .await
             .unwrap();
 
-        db::secrets::rename_secret(&mut conn, my_secret, "newsecret".to_owned())
+        db::secrets::rename_secret(&mut conn, my_secret.id, "newsecret".to_owned())
             .await
             .unwrap();
 
@@ -449,7 +467,7 @@ mod test {
                 .await
                 .unwrap()
                 .contains(&api::SecretName {
-                    id: my_secret,
+                    id: my_secret.id,
                     name: "newsecret".to_owned()
                 })
         );
@@ -479,11 +497,11 @@ mod test {
             .await
             .unwrap();
 
-        db::secrets::add_access_for(&mut conn, my_secret, my_host)
+        db::secrets::add_access_for(&mut conn, my_secret.id, my_host)
             .await
             .unwrap();
 
-        db::secrets::remove_secret(&mut conn, my_secret)
+        db::secrets::remove_secret(&mut conn, my_secret.id)
             .await
             .unwrap();
 
@@ -520,7 +538,7 @@ mod test {
             .await
             .unwrap();
 
-        db::secrets::add_access_for(&mut conn, my_secret, my_host)
+        db::secrets::add_access_for(&mut conn, my_secret.id, my_host)
             .await
             .unwrap();
 
