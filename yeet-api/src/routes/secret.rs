@@ -10,8 +10,9 @@ use crate::{
     httpsig::{ErrorForJson as _, ReqwestSig, ResponseError, sig_param},
 };
 
-#[derive(Clone, Copy, Debug, sqlx::Type, Hash, PartialEq, Eq, Serialize, Deserialize)]
-#[sqlx(transparent)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "hazard", derive(sqlx::Type))]
+#[cfg_attr(feature = "hazard", sqlx(transparent))]
 #[serde(transparent)]
 pub struct SecretID(i64);
 

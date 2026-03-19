@@ -77,6 +77,12 @@ impl FromRequestParts<YeetState> for HttpSig {
             .await
             .with_code(StatusCode::INTERNAL_SERVER_ERROR)?
         else {
+            if !db::keys::has_any(&mut conn)
+                .await
+                .with_code(StatusCode::INTERNAL_SERVER_ERROR)?
+            {
+                return Ok(HttpSig(VerifyingKey::default()));
+            }
             return Err((
                 StatusCode::BAD_REQUEST,
                 "The KeyID is not registered".to_owned(),

@@ -9,7 +9,7 @@ use serde_json_any_key::any_key_map;
 // use crate::db::secret::{SecretError, SecretStore};
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct AppState {
+struct AppState {
     admin_credentials: HashSet<VerifyingKey>,
     build_machines_credentials: HashSet<VerifyingKey>,
     // hostname -> Hosts

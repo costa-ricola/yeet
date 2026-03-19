@@ -44,4 +44,4 @@ error_set.workspace = true
 
 [dev-dependencies]
 paste = "1.0"
-axum-test = "19.1"
+axum-test.workspace = true

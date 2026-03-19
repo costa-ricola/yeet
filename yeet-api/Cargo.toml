@@ -34,4 +34,7 @@ url.workspace = true
 age.workspace = true
 
 [dev-dependencies]
+axum-test.workspace = true
+sqlx.workspace = true
 tokio = { version = "1.47", features = ["macros"] }
+yeetd = {path = "../yeet-server"}

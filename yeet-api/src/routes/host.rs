@@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::StorePath;
 
-#[derive(Clone, Copy, Debug, sqlx::Type, Deserialize, Serialize, PartialEq, Eq)]
-#[sqlx(transparent)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "hazard", derive(sqlx::Type))]
+#[cfg_attr(feature = "hazard", sqlx(transparent))]
 #[serde(transparent)]
 pub struct HostID(i64);
 
@@ -31,7 +32,8 @@ impl HostID {
 
 // State the Server wants the client to be in
 #[expect(clippy::exhaustive_structs)]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, sqlx::Type)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "hazard", derive(sqlx::Type))]
 pub enum ProvisionState {
     NotSet,
     Detached,
@@ -86,7 +88,7 @@ pub async fn rename_host<K: SigningKey + Sync>(
     url: &Url,
     key: &K,
     host: HostID,
-    new_name: String,
+    new_name: &str,
 ) -> Result<StatusCode, ResponseError> {
     reqwest::Client::new()
         .put(url.join(&format!("/host/{host}/rename/{new_name}"))?)

@@ -1,10 +1,9 @@
 //! Yeet that Config
 
-use std::{env, fs::read_to_string, str::FromStr, sync::Arc};
+use std::{env, fs::read_to_string, str::FromStr};
 
 // use routes::status;
 use sqlx::sqlite::SqlitePoolOptions;
-use tokio::net::TcpListener;
 
 // TODO: is this enough or do we need to use rand_chacha?
 
@@ -31,18 +30,13 @@ async fn main() {
     // }
     // state.purge_keyids();
 
-    let listener = {
-        let port = env::var("YEET_PORT").unwrap_or("4337".to_owned());
-        let host = env::var("YEET_HOST").unwrap_or("localhost".to_owned());
-        TcpListener::bind(format!("{host}:{port}"))
-            .await
-            .expect("Could not bind to port")
-    };
+    let port = env::var("YEET_PORT").unwrap_or("4337".to_owned());
+    let host = env::var("YEET_HOST").unwrap_or("localhost".to_owned());
 
     let age_key = {
         let path = env::var("YEET_AGE_KEY").expect("YEET_AGE_KEY was not set");
         let content = read_to_string(path).unwrap();
-        Arc::new(age::x25519::Identity::from_str(&content).unwrap())
+        age::x25519::Identity::from_str(&content).unwrap()
     };
 
     let pool = SqlitePoolOptions::new()
@@ -50,9 +44,5 @@ async fn main() {
         .await
         .expect("Can't connect to yeet.db");
 
-    let state = yeetd::YeetState { pool, age_key };
-
-    axum::serve(listener, yeetd::routes(state))
-        .await
-        .expect("Could not start axum");
+    yeetd::launch(&port, &host, pool, age_key).await;
 }

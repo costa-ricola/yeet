@@ -24,12 +24,41 @@ use ed25519_dalek::VerifyingKey;
 pub(crate) use routes::*;
 
 #[derive(Clone)]
-pub struct YeetState {
+struct YeetState {
     pub pool: sqlx::SqlitePool,
     pub age_key: Arc<age::x25519::Identity>,
 }
 
-pub fn routes(state: YeetState) -> axum::Router {
+pub async fn launch(
+    port: &str,
+    host: &str,
+    pool: sqlx::SqlitePool,
+    age_key: age::x25519::Identity,
+) -> tokio::task::JoinHandle<()> {
+    let listener = tokio::net::TcpListener::bind(format!("{host}:{port}"))
+        .await
+        .expect("Could not bind to port");
+
+    let age_key = Arc::new(age_key);
+
+    let state = YeetState { pool, age_key };
+
+    {
+        let mut conn = state.pool.acquire().await.unwrap();
+        sqlx::migrate!("../migrations")
+            .run(&mut conn)
+            .await
+            .unwrap();
+    }
+
+    tokio::spawn(async move {
+        axum::serve(listener, routes(state))
+            .await
+            .expect("Could not start axum");
+    })
+}
+
+fn routes(state: YeetState) -> axum::Router {
     axum::Router::new()
         .route("/verification/add", post(verify::add_verification_attempt))
         .route("/verification/{id}/accept", put(verify::accept_attempt))

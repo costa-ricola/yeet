@@ -29,6 +29,13 @@ pub async fn fetch_by_keyid(
     }
 }
 
+pub async fn has_any(conn: &mut sqlx::SqliteConnection) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query!(r#"SELECT 1 AS "col" FROM keys LIMIT 1"#)
+        .fetch_optional(conn)
+        .await?
+        .is_some())
+}
+
 pub async fn add_key(
     conn: &mut sqlx::SqliteConnection,
     keyid: String,
@@ -120,7 +127,7 @@ pub async fn auth_level(
 
     match user_level {
         Some(user_level) => {
-            if user_level == level {
+            if user_level == level || user_level == api::AuthLevel::Admin {
                 Ok(())
             } else {
                 Err((

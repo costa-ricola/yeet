@@ -29,9 +29,11 @@ pub async fn accept_attempt<K: SigningKey + Sync>(
     url: &Url,
     key: &K,
     id: u32,
+    hostname: &str,
 ) -> Result<Option<String>, ResponseError> {
     reqwest::Client::new()
         .put(url.join(&format!("/verification/{id}/accept"))?)
+        .json(hostname)
         .sign(&sig_param(key)?, key)
         .await?
         .send()

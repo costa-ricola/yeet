@@ -14,7 +14,11 @@ pub async fn add_key(
     VerifiedJson(api::AddKey { key, level }): VerifiedJson<api::AddKey>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
-    db::keys::auth_admin(&mut conn, http_key).await?;
+
+    // If we do not have any credentials yet we want to allow adding the first key
+    if db::keys::has_any(&mut conn).await.internal_server()? {
+        db::keys::auth_admin(&mut conn, http_key).await?;
+    }
 
     let httpsig_key = httpsig_hyper::prelude::PublicKey::from_bytes(
         &httpsig_hyper::prelude::AlgorithmName::Ed25519,
