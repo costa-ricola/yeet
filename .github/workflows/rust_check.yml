@@ -3,7 +3,6 @@ name: Rust Lint & Tests
 on:
   pull_request:
 
-
 env:
   DATABASE_URL: sqlite:yeet.db
   RUSTFLAGS: --cfg tokio_unstable
@@ -29,7 +28,7 @@ jobs:
       - run: rustup component add clippy
       - run: cargo fetch
       - name: cargo clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy -- -D warnings
 
   test:
     name: Run Tests

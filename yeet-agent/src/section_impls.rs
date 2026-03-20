@@ -1,5 +1,4 @@
 use console::{StyledObject, style};
-
 use yeet::display;
 
 use crate::section::{ColoredDisplay, DisplaySection, DisplaySectionItem};

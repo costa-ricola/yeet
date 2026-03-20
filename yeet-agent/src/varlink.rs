@@ -12,7 +12,6 @@ use rootcause::{Report, compat::ReportAsError, prelude::ResultExt as _};
 use serde::{Deserialize, Serialize};
 use tokio::fs::{self, remove_file};
 use url::Url;
-
 use zlink::{Connection, ReplyError, connection::socket::FetchPeerCredentials, proxy, unix};
 
 shadow_rs::shadow!(build);

@@ -3,8 +3,10 @@ use httpsig_hyper::prelude::SigningKey;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::StorePath;
-use crate::httpsig::{ErrorForJson as _, ReqwestSig as _, ResponseError, sig_param};
+use crate::{
+    StorePath,
+    httpsig::{ErrorForJson as _, ReqwestSig as _, ResponseError, sig_param},
+};
 
 // Action the server want the client to take
 

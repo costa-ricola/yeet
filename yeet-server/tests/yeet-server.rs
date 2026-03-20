@@ -1,7 +1,8 @@
 #[cfg(feature = "test-server")]
-use ed25519_dalek::SigningKey;
-#[cfg(feature = "test-server")]
 use std::{collections::HashMap, str::FromStr};
+
+#[cfg(feature = "test-server")]
+use ed25519_dalek::SigningKey;
 
 #[sqlx::test]
 #[cfg(feature = "test-server")]

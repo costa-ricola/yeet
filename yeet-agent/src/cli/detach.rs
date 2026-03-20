@@ -1,11 +1,10 @@
-use crate::varlink::YeetDaemonError;
 use std::path::PathBuf;
-use yeet::nix;
 
 use log::info;
 use rootcause::{Report, report};
+use yeet::nix;
 
-use crate::varlink;
+use crate::{varlink, varlink::YeetDaemonError};
 
 pub async fn detach(
     version: Option<api::StorePath>,
