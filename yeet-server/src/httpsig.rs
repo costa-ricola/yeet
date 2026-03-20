@@ -77,7 +77,7 @@ impl FromRequestParts<YeetState> for HttpSig {
             .await
             .with_code(StatusCode::INTERNAL_SERVER_ERROR)?
         else {
-            if !db::keys::has_any(&mut conn)
+            if !db::keys::has_any_admin(&mut conn)
                 .await
                 .with_code(StatusCode::INTERNAL_SERVER_ERROR)?
             {

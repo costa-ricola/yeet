@@ -29,8 +29,8 @@ pub async fn fetch_by_keyid(
     }
 }
 
-pub async fn has_any(conn: &mut sqlx::SqliteConnection) -> Result<bool, sqlx::Error> {
-    Ok(sqlx::query!(r#"SELECT 1 AS "col" FROM keys LIMIT 1"#)
+pub async fn has_any_admin(conn: &mut sqlx::SqliteConnection) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query!(r#"SELECT 1 AS "col" FROM users LIMIT 1"#)
         .fetch_optional(conn)
         .await?
         .is_some())

@@ -16,7 +16,7 @@ pub async fn add_key(
     let mut conn = state.pool.acquire().await.internal_server()?;
 
     // If we do not have any credentials yet we want to allow adding the first key
-    if db::keys::has_any(&mut conn).await.internal_server()? {
+    if db::keys::has_any_admin(&mut conn).await.internal_server()? {
         db::keys::auth_admin(&mut conn, http_key).await?;
     }
 

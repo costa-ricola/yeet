@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT 1 AS \"col\" FROM keys LIMIT 1",
+  "query": "SELECT 1 AS \"col\" FROM users LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "820e6aa18efb8b9ce8a3a9fab4e6d89c0c9e9cd1fb7a1b283d9a6efd467406c2"
+  "hash": "d31baf193e982a5cefdd35ab7fcd4071cddb4a2af30e9bd6b2f8ff8d56f15204"
 }

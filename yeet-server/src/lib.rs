@@ -34,6 +34,7 @@ use serde_json_any_key::any_key_map;
 pub struct AppState {
     #[serde(with = "any_key_map")]
     host_by_key: HashMap<VerifyingKey, String>,
+    keyids: HashMap<String, VerifyingKey>,
 }
 
 pub async fn launch(
@@ -51,11 +52,14 @@ pub async fn launch(
         // add hosts from state.json
         let state = std::fs::File::open("state.json");
         if let Ok(state) = state
-            && !db::keys::has_any(&mut conn).await.unwrap()
+            && !db::keys::has_any_admin(&mut conn).await.unwrap()
         {
             let state: AppState = serde_json::from_reader(state).unwrap();
+            let valid_keys = state.keyids.values().collect::<Vec<_>>();
             for (key, hostname) in state.host_by_key {
-                db::hosts::add_host(&mut conn, key, hostname).await.unwrap();
+                if valid_keys.contains(&&key) {
+                    db::hosts::add_host(&mut conn, key, hostname).await.unwrap();
+                }
             }
         }
     }
