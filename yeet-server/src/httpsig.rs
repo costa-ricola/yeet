@@ -8,7 +8,6 @@ use httpsig_hyper::{
     ContentDigest as _, MessageSignature as _, MessageSignatureReq as _, RequestContentDigest as _,
     prelude::{AlgorithmName, PublicKey},
 };
-
 use serde::de::DeserializeOwned;
 
 use crate::{YeetState, db, error::WithStatusCode as _};

@@ -1,8 +1,7 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr as _};
 
 use ed25519_dalek::SigningKey;
 use httpsig_hyper::prelude::{AlgorithmName, SecretKey};
-
 use yeet_api as api;
 
 #[sqlx::test]
@@ -43,7 +42,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     .await
     .unwrap();
 
-    assert!(code >= 100_000 && code <= 999_999);
+    assert!((100_000..=999_999).contains(&code));
 
     // The next thing is for an admin to approve this request
     let facter = api::accept_attempt(&url, &key, code as u32, "mysuperhostname")

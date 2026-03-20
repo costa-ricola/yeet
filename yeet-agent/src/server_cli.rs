@@ -52,8 +52,7 @@ pub async fn handle_server_commands(args: ServerArgs, config: &Config) -> Result
         }
         ServerCommands::DeleteKey { key } => {
             let status =
-                api::delete_key(url, &get_secret_key(httpsig_key)?, &get_verify_key(&key)?)
-                    .await?;
+                api::delete_key(url, &get_secret_key(httpsig_key)?, &get_verify_key(&key)?).await?;
             info!("{status}");
         }
     }

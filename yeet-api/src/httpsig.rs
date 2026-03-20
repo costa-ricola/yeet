@@ -122,7 +122,7 @@ mod test_ureq_sign {
     use httpsig_hyper::prelude::*;
     use reqwest::Client;
 
-    use crate::httpsig::ReqwestSig;
+    use crate::httpsig::ReqwestSig as _;
 
     static COMPONENTS: LazyLock<Vec<message_component::HttpMessageComponentId>> =
         LazyLock::new(|| {

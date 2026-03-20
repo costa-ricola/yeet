@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use ed25519_dalek::VerifyingKey;
-
 use http::StatusCode;
 use httpsig_hyper::prelude::SigningKey;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::httpsig::{ErrorForJson as _, ReqwestSig as _, ResponseError, sig_param};
-use serde::{Deserialize, Serialize};
-
-use crate::StorePath;
+use crate::{
+    StorePath,
+    httpsig::{ErrorForJson as _, ReqwestSig as _, ResponseError, sig_param},
+};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "hazard", derive(sqlx::Type))]
