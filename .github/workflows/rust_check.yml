@@ -1,0 +1,55 @@
+name: Rust Lint & Tests
+
+on:
+  pull_request:
+
+
+env:
+  DATABASE_URL: sqlite:yeet.db
+  RUSTFLAGS: --cfg tokio_unstable
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (rustfmt & clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+
+      - run: rustup component add rustfmt
+      - name: check rustfmt
+        run: cargo +nightly fmt -- --check --color always
+
+      - run: rustup component add clippy
+      - run: cargo fetch
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    name: Run Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fetch
+      - name: cargo test (yeetd)
+        run: cargo test -p yeetd --release --features test-server
+      - name: cargo test (yeet-api)
+        run: cargo test -p yeet-api --release
+      - name: cargo test (yeet)
+        run: cargo test -p yeet --release
