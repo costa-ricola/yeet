@@ -3,6 +3,10 @@ name: Rust Lint & Tests
 on:
   pull_request:
 
+
+env:
+  DATABASE_URL: sqlite:yeet.db
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
