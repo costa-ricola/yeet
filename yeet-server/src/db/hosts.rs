@@ -4,7 +4,7 @@ use httpsig_hyper::prelude::{AlgorithmName, PublicKey, VerifyingKey as _};
 use jiff_sqlx::ToSqlx as _;
 use sqlx::Acquire as _;
 
-use crate::db;
+use crate::db::{self};
 
 pub async fn fetch_provision_state(
     conn: &mut sqlx::SqliteConnection,
@@ -183,8 +183,11 @@ pub async fn update(
     Ok(())
 }
 
-pub async fn list(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::Host>, sqlx::Error> {
-    sqlx::query!(
+pub async fn list(
+    conn: &mut sqlx::SqliteConnection,
+    user: api::UserID,
+) -> Result<Vec<api::Host>, sqlx::Error> {
+    let mut hosts = sqlx::query!(
         r#"
         WITH current_state AS (
             SELECT host_id, state, update_time,
@@ -230,9 +233,31 @@ pub async fn list(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::Host>, s
         last_ping: row.last_ping.to_jiff(),
         version: row.current_version,
         latest_update: row.latest_update,
+        tags: Vec::new(),
     })
-    .fetch_all(conn)
-    .await
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let all_tag = db::tag::is_all_tag(&mut *conn, user).await?;
+    let mut tags =
+        db::tag::tags_of_resource_by_user(&mut *conn, user, api::tag::ResourceType::Host).await?;
+    if all_tag {
+        for host in hosts.iter_mut() {
+            if let Some(tags) = tags.remove(&api::tag::Resource::from(host.id)) {
+                host.tags = tags;
+            }
+        }
+    } else {
+        let all_hosts = hosts;
+        hosts = Vec::new();
+        for mut host in all_hosts {
+            if let Some(tags) = tags.remove(&api::tag::Resource::from(host.id)) {
+                host.tags = tags;
+                hosts.push(host);
+            }
+        }
+    }
+    Ok(hosts)
 }
 
 pub async fn rename(

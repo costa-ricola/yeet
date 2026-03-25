@@ -5,9 +5,15 @@ use httpsig_hyper::prelude::{AlgorithmName, SecretKey};
 use yeet_api as api;
 
 #[sqlx::test]
-/// This does not test authentication / system checks
 fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
-    let _handle = yeetd::launch("4337", "localhost", pool, age::x25519::Identity::generate()).await;
+    let _handle = yeetd::launch(
+        4337,
+        std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+        pool,
+        age::x25519::Identity::generate(),
+        None,
+    )
+    .await;
 
     let url = url::Url::from_str("http://localhost:4337").unwrap();
 
@@ -17,12 +23,14 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     let admin_key = SigningKey::from_bytes(&[4; 32]);
     let key = SecretKey::from_bytes(&AlgorithmName::Ed25519, &[4; 32]).unwrap();
 
-    api::add_key(
+    api::create_user(
         &url,
         &key,
-        &api::AddKey {
+        api::CreateUser {
             key: admin_key.verifying_key(),
             level: api::AuthLevel::Admin,
+            username: "mysuperadmin".into(),
+            all_tag: true,
         },
     )
     .await
@@ -65,7 +73,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     api::update_hosts(
         &url,
         &key,
-        &api::HostUpdateRequest {
+        api::HostUpdateRequest {
             hosts: HashMap::from([("mysuperhostname".into(), "mysuperversion".into())]),
             public_key: "mypublickey".into(),
             substitutor: "mycache".into(),
@@ -91,7 +99,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     let action = api::check_system(
         &url,
         &client_key,
-        &api::VersionRequest {
+        api::VersionRequest {
             store_path: "myoldversion".into(),
         },
     )
@@ -115,7 +123,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     let action = api::check_system(
         &url,
         &client_key,
-        &api::VersionRequest {
+        api::VersionRequest {
             store_path: "mysuperversion".into(),
         },
     )
@@ -151,7 +159,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     let action = api::check_system(
         &url,
         &client_key,
-        &api::VersionRequest {
+        api::VersionRequest {
             store_path: "mydetachedversion".into(),
         },
     )
@@ -170,7 +178,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     api::update_hosts(
         &url,
         &key,
-        &api::HostUpdateRequest {
+        api::HostUpdateRequest {
             hosts: HashMap::from([("mynewname".into(), "mynewversion".into())]),
             public_key: "mypublickey".into(),
             substitutor: "mycache".into(),
@@ -196,7 +204,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     let action = api::check_system(
         &url,
         &client_key,
-        &api::VersionRequest {
+        api::VersionRequest {
             store_path: "mydetachedversion".into(),
         },
     )
@@ -215,7 +223,7 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
     let action = api::check_system(
         &url,
         &client_key,
-        &api::VersionRequest {
+        api::VersionRequest {
             store_path: "mynewversion".into(),
         },
     )
@@ -269,4 +277,179 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
         .await
         .unwrap();
     assert_eq!(secret, Some(b"secretstuff".to_vec()));
+}
+
+#[sqlx::test]
+fn api_e2e_with_non_superuser(pool: sqlx::SqlitePool) {
+    let _handle = yeetd::launch(
+        4338,
+        std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+        pool,
+        age::x25519::Identity::generate(),
+        None,
+    )
+    .await;
+
+    let url = url::Url::from_str("http://localhost:4338").unwrap();
+
+    // first we need to add our admin credentials.
+    // The api will allow us to add it when no credentials are specified yet
+
+    let admin_signing_key = SigningKey::from_bytes(&[4; 32]);
+    let admin_key = SecretKey::from_bytes(&AlgorithmName::Ed25519, &[4; 32]).unwrap();
+
+    api::create_user(
+        &url,
+        &admin_key,
+        api::CreateUser {
+            key: admin_signing_key.verifying_key(),
+            level: api::AuthLevel::Admin,
+            username: "mysuperadmin".into(),
+            all_tag: true,
+        },
+    )
+    .await
+    .unwrap();
+
+    // To test the scoping of tags we want to create a new user that does not see all tags
+    let signing_key = SigningKey::from_bytes(&[5; 32]);
+    let key = SecretKey::from_bytes(&AlgorithmName::Ed25519, &[5; 32]).unwrap();
+
+    let normal_admin = api::create_user(
+        &url,
+        &admin_key, // the admin user thas to create the key
+        api::CreateUser {
+            key: signing_key.verifying_key(),
+            level: api::AuthLevel::Admin, // he es still an admin e.g. can modify stuff - just not an suepr admin
+            username: "mynormaladmin".into(),
+            all_tag: false,
+        },
+    )
+    .await
+    .unwrap();
+
+    // The first thing a new host does is to create a verification attempt
+    let new_host = SigningKey::from_bytes(&[3; 32]);
+
+    let code = api::add_verification_attempt(
+        &url,
+        &api::VerificationAttempt {
+            key: new_host.verifying_key(),
+            nixos_facter: Some("Just some facts about a host".into()),
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!((100_000..=999_999).contains(&code));
+
+    // A normal admin is not allowed to accept verify requests
+    let _err = api::accept_attempt(&url, &key, code as u32, "mysuperhostname")
+        .await
+        .unwrap_err();
+
+    // but our admin can
+    let facter = api::accept_attempt(&url, &admin_key, code as u32, "mysuperhostname")
+        .await
+        .unwrap();
+
+    assert_eq!(facter, Some("Just some facts about a host".into()));
+
+    // our admin can see the host
+    let hosts = api::list_hosts(&url, &admin_key).await.unwrap();
+    assert!(hosts.len() == 1);
+
+    // our normal admin can't
+    let hosts = api::list_hosts(&url, &key).await.unwrap();
+    assert!(hosts.len() == 0);
+
+    // our normal admin can't push updates on hosts he does not own
+    api::update_hosts(
+        &url,
+        &key,
+        api::HostUpdateRequest {
+            hosts: HashMap::from([("mysuperhostname".into(), "mysuperversion".into())]),
+            public_key: "mypublickey".into(),
+            substitutor: "mycache".into(),
+        },
+    )
+    .await
+    .unwrap_err();
+
+    // or rename even if does know the id
+    let hosts = api::list_hosts(&url, &admin_key).await.unwrap();
+    api::rename_host(&url, &key, hosts.first().unwrap().id, "mynewname")
+        .await
+        .unwrap_err();
+
+    // most importantly he has no permission to create new users
+    let never_key = SigningKey::from_bytes(&[6; 32]);
+
+    api::create_user(
+        &url,
+        &key,
+        api::CreateUser {
+            key: never_key.verifying_key(),
+            level: api::AuthLevel::Admin,
+            username: "never".into(),
+            all_tag: false,
+        },
+    )
+    .await
+    .unwrap_err();
+
+    // But we can give him access to some resources with tags
+    // our normal admin can't create tags
+    api::tag::create_tag(&url, &key, "mytag").await.unwrap_err();
+
+    let tag = api::tag::create_tag(&url, &admin_key, "mytag")
+        .await
+        .unwrap();
+
+    // Even if he knows the tag he can't give him access to resources
+    let hosts = api::list_hosts(&url, &admin_key).await.unwrap();
+    api::tag::add_resource_to_tag(
+        &url,
+        &key,
+        api::tag::ResourceTag {
+            resource: hosts.first().unwrap().id.into(),
+            tag,
+        },
+    )
+    .await
+    .unwrap_err();
+
+    api::tag::add_resource_to_tag(
+        &url,
+        &admin_key,
+        api::tag::ResourceTag {
+            resource: hosts.first().unwrap().id.into(),
+            tag,
+        },
+    )
+    .await
+    .unwrap();
+    let hosts = api::list_hosts(&url, &admin_key).await.unwrap();
+
+    assert_eq!(
+        hosts.first().unwrap().tags.first().unwrap().name,
+        "mytag".to_owned()
+    );
+
+    // but this is still not visisble to my normal admin
+    let hosts = api::list_hosts(&url, &key).await.unwrap();
+    assert!(hosts.len() == 0);
+
+    // because we first have to create an policy so that our user is able to
+    // view `mytag`
+    api::tag::tag_allow_user(&url, &key, tag, normal_admin)
+        .await
+        .unwrap_err();
+    api::tag::tag_allow_user(&url, &admin_key, tag, normal_admin)
+        .await
+        .unwrap();
+
+    // now he can see the host
+    let hosts = api::list_hosts(&url, &key).await.unwrap();
+    assert!(hosts.len() == 1);
 }

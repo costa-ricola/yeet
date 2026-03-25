@@ -28,7 +28,6 @@ ed25519-dalek.workspace = true
 http.workspace = true
 ssh-key.workspace = true
 thiserror.workspace = true
-serde_json_any_key.workspace = true
 error_set.workspace = true
 url.workspace = true
 age.workspace = true

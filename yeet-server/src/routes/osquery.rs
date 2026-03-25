@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 use axum::{
     Json,
@@ -10,15 +10,16 @@ use indexmap::IndexMap;
 use crate::{
     YeetState, db,
     error::InternalError as _,
-    httpsig::{HttpSig, VerifiedJson},
+    httpsig::{User, VerifiedJson},
 };
 
 pub async fn list_nodes(
     State(state): State<YeetState>,
-    HttpSig(key): HttpSig,
+    User(user): User,
 ) -> Result<Json<Vec<api::Node>>, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
-    db::keys::auth_admin(&mut conn, key).await?;
+    db::tag::auth_osquery(&mut conn, user).await?;
+
     Ok(Json(
         db::osquery::list_nodes(&mut conn).await.internal_server()?,
     ))
@@ -26,13 +27,13 @@ pub async fn list_nodes(
 
 pub async fn create_query(
     State(state): State<YeetState>,
-    HttpSig(key): HttpSig,
+    User(user): User,
     VerifiedJson(query): VerifiedJson<api::CreateQuery>,
 ) -> Result<Json<api::QueryID>, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
-    db::keys::auth_admin(&mut conn, key).await?;
+    db::tag::auth_osquery(&mut conn, user).await?;
     Ok(Json(
-        db::osquery::create_query(&mut conn, key, query.sql)
+        db::osquery::create_query(&mut conn, user, query.sql)
             .await
             .internal_server()?,
     ))
@@ -40,11 +41,12 @@ pub async fn create_query(
 
 pub async fn query_response_all(
     State(state): State<YeetState>,
-    HttpSig(key): HttpSig,
+    User(user): User,
     Path(query): Path<api::QueryID>,
 ) -> Result<Json<api::QueryFulfillment>, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
-    db::keys::auth_admin(&mut conn, key).await?;
+    db::tag::auth_osquery(&mut conn, user).await?;
+
     Ok(Json(
         db::osquery::get_query_response_all(&mut conn, query)
             .await

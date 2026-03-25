@@ -8,6 +8,7 @@ use std::{
 };
 
 use age::secrecy::ExposeSecret as _;
+use axum_server::tls_rustls::RustlsConfig;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
 #[tokio::main]
@@ -39,6 +40,10 @@ async fn main() {
         }
     };
 
+    let tls = RustlsConfig::from_pem_file("cert.pem", "key.pem")
+        .await
+        .unwrap();
+
     let options = SqliteConnectOptions::new()
         .filename("yeet.db")
         .create_if_missing(true);
@@ -48,6 +53,6 @@ async fn main() {
         .await
         .expect("Can't connect to yeet.db");
 
-    let handle = yeetd::launch(port, host, pool, age_key).await;
+    let handle = yeetd::launch(port, host, pool, age_key, Some(tls)).await;
     handle.await.expect("axum quit");
 }

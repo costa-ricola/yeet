@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use ed25519_dalek::VerifyingKey;
 use indexmap::IndexMap;
 use sqlx::{Acquire, types::Json};
 use uuid::Uuid;
@@ -33,21 +32,15 @@ pub async fn list_nodes(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::No
 
 pub async fn create_query(
     conn: &mut sqlx::SqliteConnection,
-    user: VerifyingKey,
+    user: api::UserID,
     query: String,
 ) -> Result<api::QueryID, sqlx::Error> {
     let mut tx = conn.begin().await?;
-    let user = &user.as_bytes()[..];
-
-    // TODO no user lookup
-    let user_id = sqlx::query_scalar!("SELECT id FROM keys WHERE verifying_key = $1", user)
-        .fetch_one(&mut *tx)
-        .await?;
 
     let query_id = sqlx::query!(
         r#"INSERT INTO osquery_dq_queries (query,user_id) VALUES ($1,$2) "#,
         query,
-        user_id
+        user
     )
     .execute(&mut *tx)
     .await?

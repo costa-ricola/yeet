@@ -12,8 +12,6 @@ description = "Pull-based NixOs deployment server"
 [lints]
 workspace = true
 
-[features]
-test-server = ["dep:axum-test"]
 
 [dependencies]
 axum = {version = "0.8", features = ["macros"]}
