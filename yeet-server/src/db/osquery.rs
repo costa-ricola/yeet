@@ -227,7 +227,7 @@ mod test {
         let encrypted = age::encrypt(&store_key.to_public(), b"my-secret-enroll-secret").unwrap();
 
         let _enroll_secret =
-            db::secrets::add_secret(&mut conn, "enroll-secret", encrypted, &store_key)
+            db::secrets::add_secret(&mut conn, "osquery-enroll", encrypted, &store_key)
                 .await
                 .unwrap();
 

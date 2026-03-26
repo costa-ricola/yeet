@@ -29,3 +29,8 @@ yeet.db
 
 *-shm
 *-wal
+*.dv
+
+# codecov
+*.html
+*.profraw

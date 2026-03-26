@@ -42,7 +42,8 @@ fn api_e2e_with_credentials(pool: sqlx::SqlitePool) {
 
     let code = api::add_verification_attempt(
         &url,
-        &api::VerificationAttempt {
+        &client_key,
+        api::VerificationAttempt {
             key: new_host.verifying_key(),
             nixos_facter: Some("Just some facts about a host".into()),
         },
@@ -333,7 +334,8 @@ fn api_e2e_with_non_superuser(pool: sqlx::SqlitePool) {
 
     let code = api::add_verification_attempt(
         &url,
-        &api::VerificationAttempt {
+        &key,
+        api::VerificationAttempt {
             key: new_host.verifying_key(),
             nixos_facter: Some("Just some facts about a host".into()),
         },

@@ -22,6 +22,7 @@ in
     sqlx-cli
     bacon
     sqlite-interactive
+    pkgs-unstable.cargo-tarpaulin
   ];
   env.RUSTFLAGS = "--cfg tokio_unstable";
   env.DATABASE_URL = "sqlite:yeet.db";
