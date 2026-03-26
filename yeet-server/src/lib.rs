@@ -133,9 +133,7 @@ fn routes(state: YeetState) -> axum::Router {
         // `api::auth::Secret::Delete`
         .route("/secret/{id}/delete", delete(secret::delete_secret))
         // `api::auth::Secret::View`
-        .route("/secret/list", get(secret::list))
-        // `api::auth::Secret::View`
-        .route("/secret/acl", get(secret::list_acl))
+        .route("/secret/list", get(secret::list_secrets))
         // Public
         .route("/secret/server_key", get(secret::get_server_age_key)) // locked
         // Public
@@ -143,10 +141,11 @@ fn routes(state: YeetState) -> axum::Router {
         // === Keys
         .route("/key/delete", delete(key::delete_key))
         // === User
-        // .route("/user", get(user::list_users))
+        .route("/user", get(user::list_users))
         .route("/user/create", post(user::create_user))
         .route("/user/{user_id}/rename/{name}", put(user::rename_user))
         // === Tags
+        .route("/tag", get(tag::list_tags))
         .route("/tag/create/{name}", post(tag::create_tag))
         .route("/tag/{tag}/rename/{name}", put(tag::rename_tag))
         .route("/tag/{tag}/delete", delete(tag::delete_tag))
@@ -156,7 +155,7 @@ fn routes(state: YeetState) -> axum::Router {
         .route("/resource/delete_tag", delete(tag::delete_resource_tag))
         // === Hosts
         // `api::auth::Host::View`
-        .route("/host", get(host::list))
+        .route("/host", get(host::list_hosts))
         // `api::auth::Host::Rename`
         .route("/host/{id}/rename/{name}", put(host::rename_host))
         // `api::auth::Host::Update`

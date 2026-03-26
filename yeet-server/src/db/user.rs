@@ -1,5 +1,6 @@
 use ed25519_dalek::VerifyingKey;
 use sqlx::Acquire as _;
+use sqlx::types::Json;
 
 use crate::db;
 
@@ -78,4 +79,33 @@ pub async fn rename_user(
     .execute(conn)
     .await?;
     Ok(())
+}
+
+pub async fn list_users(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::User>, sqlx::Error> {
+    let users = sqlx::query!(
+        r#"
+        SELECT
+            u.id as "id!: api::UserID",
+            u.username as "username!",
+            u.level as "level!: api::AuthLevel",
+            json_group_array(json_object('id', t.id, 'name', t.name)) as "tags!: Json<Vec<api::tag::Tag>>"
+        FROM users u
+        LEFT JOIN policies p
+            ON p.user_id = u.id
+            AND u.all_tag != 1
+        LEFT JOIN tags t
+            ON (u.all_tag = 1 OR p.tag_id = t.id)
+        GROUP BY u.id, u.username, u.level;
+        "#
+    )
+    .map(|row| api::User {
+        id: row.id,
+        username: row.username,
+        level: row.level,
+        tags: row.tags.0,
+    })
+    .fetch_all(conn)
+    .await?;
+
+    Ok(users)
 }

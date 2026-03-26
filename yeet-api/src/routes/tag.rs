@@ -8,6 +8,7 @@ use crate::{HostID, SecretID, UserID, request};
 crate::db_id!(TagID);
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+
 pub struct Tag {
     pub id: TagID,
     pub name: String,
@@ -96,22 +97,27 @@ request! (
     delete("/tag/{tag}/remove/{user}") -> StatusCode
 );
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct ResourceTag {
     pub resource: Resource,
     pub tag: TagID,
 }
 
 request! (
-    add_resource_to_tag(resource: ResourceTag),
+    tag_resource(resource: ResourceTag),
     put("/resource/add_tag") -> StatusCode,
     body: &resource
 );
 
 request! (
-    delete_resource_to_tag(resource: ResourceTag),
+    delete_resource_from_tag(resource: ResourceTag),
     delete("/resource/delete_tag") -> StatusCode,
     body: &resource
+);
+
+request! (
+    list_tags(),
+    get("/tag") -> Vec<Tag>
 );
 
 // pub type Tag = uuid::Uuid;

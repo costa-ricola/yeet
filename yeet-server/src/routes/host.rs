@@ -10,15 +10,44 @@ use crate::{
     httpsig::{User, VerifiedJson},
 };
 
-pub async fn list(
+pub async fn list_hosts(
     State(state): State<YeetState>,
     User(user): User,
 ) -> Result<Json<Vec<api::Host>>, (StatusCode, String)> {
     let mut conn = state.pool.acquire().await.internal_server()?;
     db::tag::auth_admin(&mut conn, user).await?;
-    Ok(Json(
-        db::hosts::list(&mut conn, user).await.internal_server()?,
-    ))
+
+    // get all hosts
+    let hosts = db::hosts::list_hosts(&mut conn, user)
+        .await
+        .internal_server()?;
+
+    // // filter them by tags
+    // let all_tag = db::tag::is_all_tag(&mut *conn, user)
+    //     .await
+    //     .internal_server()?;
+    // let mut tags =
+    //     db::tag::tags_of_resource_by_user(&mut *conn, user, api::tag::ResourceType::Host)
+    //         .await
+    //         .internal_server()?;
+    // if all_tag {
+    //     for host in hosts.iter_mut() {
+    //         if let Some(tags) = tags.remove(&api::tag::Resource::from(host.id)) {
+    //             host.tags = tags;
+    //         }
+    //     }
+    // } else {
+    //     let all_hosts = hosts;
+    //     hosts = Vec::new();
+    //     for mut host in all_hosts {
+    //         if let Some(tags) = tags.remove(&api::tag::Resource::from(host.id)) {
+    //             host.tags = tags;
+    //             hosts.push(host);
+    //         }
+    //     }
+    // }
+
+    Ok(Json(hosts))
 }
 
 pub async fn rename_host(

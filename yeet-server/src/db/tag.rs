@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use axum::http::StatusCode;
-use futures::TryStreamExt as _;
 
 use crate::error::InternalError as _;
 
@@ -118,87 +115,16 @@ pub async fn remove_user_from_tag(
     Ok(())
 }
 
-pub async fn tags_of_resource_by_user(
-    conn: &mut sqlx::SqliteConnection,
-    user: api::UserID,
-    rtype: api::tag::ResourceType,
-) -> Result<HashMap<api::tag::Resource, Vec<api::tag::Tag>>, sqlx::Error> {
-    let is_all_tag = is_all_tag(conn, user).await?;
-
-    let resources = if is_all_tag {
-        sqlx::query!(
-            r#"
-            SELECT resource_id, tags.id, tags.name FROM resource_tags
-            JOIN tags on resource_tags.tag_id = tags.id
-            WHERE resource_type = $1"#,
-            rtype
-        )
-        .fetch(conn)
-        .map_ok(|row| {
-            (
-                rtype.with_id(row.resource_id),
-                api::tag::Tag {
-                    id: api::tag::TagID::new(row.id),
-                    name: row.name,
-                },
-            )
-        })
-        .try_fold(
-            HashMap::<_, Vec<_>>::new(),
-            |mut acc, (key, value)| async move {
-                acc.entry(key).or_default().push(value);
-                Ok(acc)
-            },
-        )
-        .await?
-    } else {
-        sqlx::query!(
-            r#"
-            SELECT resource_id, tags.id, tags.name FROM resource_tags
-            JOIN policies on policies.tag_id = resource_tags.tag_id
-            JOIN tags on policies.tag_id = tags.id
-            WHERE user_id = $1 AND resource_type = $2"#,
-            user,
-            rtype
-        )
-        .fetch(conn)
-        .map_ok(|row| {
-            (
-                rtype.with_id(row.resource_id),
-                api::tag::Tag {
-                    id: api::tag::TagID::new(row.id),
-                    name: row.name,
-                },
-            )
-        })
-        .try_fold(
-            HashMap::<_, Vec<_>>::new(),
-            |mut acc, (key, value)| async move {
-                acc.entry(key).or_default().push(value);
-                Ok(acc)
-            },
-        )
-        .await?
-    };
-
-    Ok(resources)
-}
-
 pub async fn auth_tag(
     conn: &mut sqlx::SqliteConnection,
     user: api::UserID,
     resource: api::tag::Resource,
 ) -> Result<(), (StatusCode, String)> {
-    if is_all_tag(&mut *conn, user).await.internal_server()? {
-        return Ok(());
-    }
-
     let resource_id = i64::from(resource);
     let resource_type = api::tag::ResourceType::from(resource);
     let policy = sqlx::query_scalar!(
         r#"
-        SELECT user_id FROM policies
-        JOIN resource_tags on policies.tag_id = resource_tags.tag_id
+        SELECT user_id FROM access
         WHERE user_id = $1 AND resource_type = $2 AND resource_id = $3"#,
         user,
         resource_type,
@@ -229,6 +155,26 @@ pub async fn auth_all_tag(
             "You have no permission to access this resource".to_owned(),
         ))
     }
+}
+
+pub async fn list_tags(
+    conn: &mut sqlx::SqliteConnection,
+) -> Result<Vec<api::tag::Tag>, sqlx::Error> {
+    let tags = sqlx::query!(
+        r#"
+        SELECT
+            tags.id as "id: api::tag::TagID",
+            tags.name
+        FROM tags
+        "#
+    )
+    .map(|row| api::tag::Tag {
+        id: row.id,
+        name: row.name,
+    })
+    .fetch_all(conn)
+    .await?;
+    Ok(tags)
 }
 
 pub async fn is_all_tag(

@@ -5,7 +5,7 @@ use url::Url;
 use crate::{
     HostID,
     httpsig::{ErrorForJson as _, ReqwestSig as _, ResponseError, sig_param},
-    request,
+    request, tag,
 };
 
 crate::db_id!(SecretID);
@@ -14,6 +14,8 @@ crate::db_id!(SecretID);
 pub struct SecretName {
     pub id: SecretID,
     pub name: String,
+    pub tags: Vec<tag::Tag>,
+    pub hosts: Vec<HostID>,
 }
 
 impl std::fmt::Display for SecretName {
@@ -29,7 +31,7 @@ pub struct GetSecretRequest {
 }
 
 request! (
-    add_secret(name: &str, secret: &[u8]),
+    create_secret(name: &str, secret: &[u8]),
     post("/secret/add/{name}") -> SecretName,
     body: secret
 );
@@ -57,11 +59,6 @@ request! (
 request! (
     list_secrets(),
     get("/secret/list") -> Vec<SecretName>
-);
-
-request! (
-    list_secret_acl(),
-    get("/secret/acl") -> Vec<(SecretName, Vec<HostID>)>
 );
 
 request! (

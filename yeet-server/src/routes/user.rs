@@ -72,3 +72,15 @@ pub async fn rename_user(
 
     Ok(StatusCode::OK)
 }
+
+pub async fn list_users(
+    State(state): State<YeetState>,
+    User(user): User,
+) -> Result<Json<Vec<api::User>>, (StatusCode, String)> {
+    let mut conn = state.pool.acquire().await.internal_server()?;
+    db::tag::auth_admin(&mut conn, user).await?;
+    db::tag::auth_all_tag(&mut conn, user).await?;
+    Ok(Json(
+        db::user::list_users(&mut conn).await.internal_server()?,
+    ))
+}

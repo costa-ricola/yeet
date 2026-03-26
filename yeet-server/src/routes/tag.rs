@@ -111,3 +111,13 @@ pub async fn delete_resource_tag(
 
     Ok(StatusCode::OK)
 }
+
+pub async fn list_tags(
+    State(state): State<YeetState>,
+    User(user): User,
+) -> Result<Json<Vec<api::tag::Tag>>, (StatusCode, String)> {
+    let mut conn = state.pool.acquire().await.internal_server()?;
+    db::tag::auth_admin(&mut conn, user).await?;
+    db::tag::auth_all_tag(&mut conn, user).await?;
+    Ok(Json(db::tag::list_tags(&mut conn).await.internal_server()?))
+}
