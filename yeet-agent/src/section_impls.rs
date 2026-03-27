@@ -1,17 +1,7 @@
-use console::{StyledObject, style};
+use colored::Colorize;
 use yeet::display;
 
-use crate::section::{ColoredDisplay, DisplaySection, DisplaySectionItem};
-
-impl ColoredDisplay<&str> for api::ProvisionState {
-    fn colored_display(&self) -> StyledObject<&'static str> {
-        match self {
-            api::ProvisionState::NotSet => style("Not set").blue(),
-            api::ProvisionState::Detached => style("Detached").yellow(),
-            api::ProvisionState::Provisioned => style("Provisioned").green(),
-        }
-    }
-}
+use crate::section::{DisplaySection, DisplaySectionItem};
 
 impl DisplaySectionItem for api::Host {
     fn as_section_item(&self) -> (String, String) {
@@ -21,20 +11,20 @@ impl DisplaySectionItem for api::Host {
                 #[expect(clippy::string_slice)]
                 version[pos..].to_owned()
             }
-            None => style("Not Set").blue().to_string(),
+            None => "Not Set".blue().to_string(),
         };
 
         let up_to_date = if self.version == self.latest_update {
-            style("Up to date ").green()
+            "Up to date ".green()
         } else {
-            style("Outdated   ").red()
+            "Outdated   ".red()
         };
 
         (
             self.hostname.clone(),
             format!(
                 "{} ({}) {up_to_date}{}",
-                self.state.colored_display(),
+                self.state,
                 commit_ver,
                 display::time_diff(
                     self.last_ping,
@@ -52,16 +42,13 @@ impl DisplaySection for api::Host {
         let mut items = Vec::new();
 
         let up_to_date = if self.version == self.latest_update {
-            style("Yes").green().bold()
+            "Yes".green().bold()
         } else {
-            style("No").red().bold()
+            "No".red().bold()
         };
         items.push(("Up to date".to_owned(), up_to_date.to_string()));
 
-        items.push((
-            "Mode".to_owned(),
-            self.state.colored_display().bold().to_string(),
-        ));
+        items.push(("Mode".to_owned(), self.state.to_string().bold().to_string()));
 
         if let Some(version) = &self.version {
             items.push(("Current version".to_owned(), version.clone()));
@@ -83,7 +70,7 @@ impl DisplaySection for api::Host {
             items.push(("Last seen".to_owned(), last_seen.clone()));
         };
 
-        (style(&self.hostname).underlined().to_string(), items)
+        (self.hostname.underline().to_string(), items)
     }
 }
 
@@ -101,9 +88,15 @@ impl DisplaySection for api::Node {
                 .collect()
         };
 
-        (
-            style(&self.host_identifier).underlined().to_string(),
-            details,
-        )
+        (self.host_identifier.underline().to_string(), details)
+    }
+}
+
+impl DisplaySectionItem for api::User {
+    fn as_section_item(&self) -> (String, String) {
+        let str = self.to_string();
+        let (l, r) = str.split_once(":").unwrap();
+
+        (l.to_string(), r.trim().to_owned())
     }
 }

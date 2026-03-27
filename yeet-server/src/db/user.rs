@@ -86,10 +86,14 @@ pub async fn list_users(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::Us
         r#"
         SELECT
             u.id as "id!: api::UserID",
+            k.verifying_key as "key!",
             u.username as "username!",
             u.level as "level!: api::AuthLevel",
-            json_group_array(json_object('id', t.id, 'name', t.name)) as "tags!: Json<Vec<api::tag::Tag>>"
+            u.all_tag as "all_tag: bool",
+            json_group_array(json_object('id', t.id, 'name', t.name))
+                FILTER (WHERE t.id IS NOT NULL) as "tags!: Json<Vec<api::tag::Tag>>"
         FROM users u
+        LEFT JOIN keys k on k.id = u.key_id
         LEFT JOIN policies p
             ON p.user_id = u.id
             AND u.all_tag != 1
@@ -100,7 +104,10 @@ pub async fn list_users(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::Us
     )
     .map(|row| api::User {
         id: row.id,
+        key: VerifyingKey::from_bytes(&row.key.try_into().expect("we only store valid keys"))
+            .expect("we only store valid keys"),
         username: row.username,
+        all_tag: row.all_tag,
         level: row.level,
         tags: row.tags.0,
     })

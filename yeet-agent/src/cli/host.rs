@@ -1,4 +1,4 @@
-use console::style;
+use colored::Colorize;
 use log::info;
 use rootcause::Report;
 
@@ -29,13 +29,12 @@ pub async fn remove(config: &Config) -> Result<(), Report> {
 
     // The user has to confirm the action
     let confirm = inquire::Confirm::new(
-        &style(format!(
+        &format!(
             "Are you sure you want to delete {}. It will delete every trace of this host.
             This action is not reversable",
             selected_host.hostname
-        ))
-        .red()
-        .to_string(),
+        )
+        .red(),
     )
     .with_default(false)
     .prompt()?;
@@ -49,7 +48,7 @@ pub async fn remove(config: &Config) -> Result<(), Report> {
 
     // no takies backsies past this point
 
-    api::delete_key(&url, secret_key, &selected_host.key).await?;
+    api::delete_key(&url, secret_key, selected_host.key).await?;
 
     info!("Deleted!");
 

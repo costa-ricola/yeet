@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
+use colored::Colorize as _;
 use ed25519_dalek::VerifyingKey;
 
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,27 @@ pub enum ProvisionState {
     Detached,
     Provisioned,
 }
+
+impl Display for ProvisionState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let colored = match self {
+            ProvisionState::NotSet => "Not set".blue(),
+            ProvisionState::Detached => "Detached".yellow(),
+            ProvisionState::Provisioned => "Provisioned".green(),
+        };
+        write!(f, "{colored}")
+    }
+}
+// impl ColoredDisplay for api::ProvisionState {
+//     fn colored_display(&self) -> StyledObject<&'static str> {
+//         match self {
+//             api::ProvisionState::NotSet => "Not set".blue(),
+//             api::ProvisionState::Detached => "Detached".yellow(),
+//             api::ProvisionState::Provisioned => "Provisioned".green(),
+//         }
+//     }
+// }
+
 impl Default for ProvisionState {
     #[inline]
     fn default() -> Self {

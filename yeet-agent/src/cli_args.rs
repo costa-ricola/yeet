@@ -145,6 +145,9 @@ pub enum Commands {
     Server(ServerArgs),
     Host(HostArgs),
     Secret(crate::cli::secret::SecretArgs),
+    /// List all users
+    Users,
+    User(crate::cli::user::UserArgs),
 }
 #[derive(Args)]
 pub struct HostArgs {
@@ -189,22 +192,21 @@ pub enum ServerCommands {
         #[arg(long)]
         substitutor: String,
     },
-
-    /// Add a new admin or build key to the server
-    AddKey {
-        /// Public key to add
-        #[arg(index = 1)]
-        key: PathBuf,
-        /// Should the key be added as admin or as build
-        #[arg(value_enum, index = 2)]
-        admin: AuthLevel,
-    },
-    /// Remove a key from the server (can also used to remove hosts)
-    DeleteKey {
-        /// Public key to remove
-        #[arg(index = 1)]
-        key: PathBuf,
-    },
+    // /// Add a new admin or build key to the server
+    // AddKey {
+    //     /// Public key to add
+    //     #[arg(index = 1)]
+    //     key: PathBuf,
+    //     /// Should the key be added as admin or as build
+    //     #[arg(value_enum, index = 2)]
+    //     admin: AuthLevel,
+    // },
+    // /// Remove a key from the server (can also used to remove hosts)
+    // DeleteKey {
+    //     /// Public key to remove
+    //     #[arg(index = 1)]
+    //     key: PathBuf,
+    // },
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]

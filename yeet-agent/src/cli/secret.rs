@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File, io::Read as _, path::Path};
 
 use clap::{Args, Subcommand};
-use console::style;
+use colored::Colorize;
 use inquire::validator::Validation;
 use rootcause::Report;
 
@@ -108,11 +108,7 @@ async fn remove(config: &Config) -> Result<(), Report> {
 
     // The user has to confirm the action
     let confirm = inquire::Confirm::new(
-        &style(format!(
-            "Are you sure you want to delete {secret}. This action is not reversable"
-        ))
-        .red()
-        .to_string(),
+        &format!("Are you sure you want to delete {secret}. This action is not reversable").red(),
     )
     .with_default(false)
     .prompt()?;
@@ -185,12 +181,11 @@ async fn deny(config: &Config) -> Result<(), Report> {
 
     let mut hosts = {
         // collect acl
-        let mut acl = api::list_secret_acl(&url, secret_key).await?;
 
-        // only want the acl that are selected
-        acl.retain(|(secret, _v)| selected_secrets.contains(secret));
-
-        let host_ids: Vec<api::HostID> = acl.into_iter().flat_map(|(_k, hosts)| hosts).collect();
+        let host_ids: Vec<api::HostID> = selected_secrets
+            .iter()
+            .flat_map(|secret| secret.hosts.clone())
+            .collect();
         let mut hosts = api::list_hosts(&url, secret_key).await?;
         // only want hosts in the acl
         hosts.retain(|host| host_ids.contains(&host.id));
@@ -230,9 +225,9 @@ async fn show(config: &Config) -> Result<(), Report> {
     let url = common::get_server_url(config).await?;
     let secret_key = &ssh::key_by_url(&url)?;
 
-    let acl = api::list_secret_acl(&url, secret_key).await?;
+    let secrets = api::list_secrets(&url, secret_key).await?;
 
-    if acl.is_empty() {
+    if secrets.is_empty() {
         log::info!("No secrets yet!");
         return Ok(());
     }
@@ -246,9 +241,10 @@ async fn show(config: &Config) -> Result<(), Report> {
     };
 
     let mut sections = Vec::new();
-    for (secret, hosts) in acl {
+    for secret in secrets {
         // map the host ids to hostnames
-        let mut hosts: Vec<String> = hosts
+        let mut hosts: Vec<String> = secret
+            .hosts
             .iter()
             .map(|host| {
                 all_hosts
@@ -260,7 +256,7 @@ async fn show(config: &Config) -> Result<(), Report> {
         hosts.sort();
 
         sections.push((
-            style(format!("{secret}:")).bold().underlined().to_string(),
+            format!("{secret}:").bold().underline().to_string(),
             vec![("Hosts".to_owned(), hosts.join("\n"))],
         ));
     }

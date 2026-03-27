@@ -1,4 +1,4 @@
-use console::style;
+use colored::Colorize;
 use jiff::{Timestamp, Unit, Zoned};
 
 // pub trait Fragment {
@@ -26,9 +26,9 @@ pub fn time_diff(timestamp: Timestamp, unit: Unit, threshold: f64, smallest: Uni
         .unwrap();
 
     if span.total((unit, &Zoned::now())).unwrap().abs() < threshold {
-        style(format!("{span:#}")).green().bold()
+        format!("{span:#}").green().bold()
     } else {
-        style(format!("{span:#}")).red().bold()
+        format!("{span:#}").red().bold()
     }
     .to_string()
 }

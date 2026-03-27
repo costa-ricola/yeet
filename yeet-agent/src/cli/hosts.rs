@@ -1,4 +1,4 @@
-use console::style;
+use colored::Colorize;
 use rootcause::Report;
 
 use crate::{
@@ -25,7 +25,7 @@ pub async fn hosts(config: &Config, full: bool) -> Result<(), Report> {
             hosts.into_iter().map(|host| host.as_section()).collect()
         } else {
             vec![(
-                style("Hosts:").underlined().to_string(),
+                "Hosts:".underline().to_string(),
                 hosts
                     .into_iter()
                     .map(|host| host.as_section_item())

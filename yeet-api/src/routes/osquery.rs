@@ -26,7 +26,7 @@ pub struct CreateQuery {
 
 request! (
     create_query(query: CreateQuery),
-    post("/osquery/query/create") -> Vec<Node>,
+    post("/osquery/query/create") -> QueryID,
     body: &query
 );
 
@@ -45,5 +45,5 @@ pub struct QueryResponse {
 
 request! (
     query_response_all(query: QueryID),
-    get("/osquery/query/response/{query}") -> Vec<Node>
+    get("/osquery/query/response/{query}") -> QueryFulfillment
 );

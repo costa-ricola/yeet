@@ -29,7 +29,7 @@ pub async fn query(config: &Config, sql: String) -> Result<(), Report> {
     let url = common::get_server_url(config).await?;
     let key = &ssh::key_by_url(&url)?;
 
-    let query = api::create_query(&url, key, &api::CreateQuery { sql }).await?;
+    let query = api::create_query(&url, key, api::CreateQuery { sql }).await?;
 
     let mut response = api::query_response_all(&url, key, query).await?;
     while !response.missing.is_empty() {

@@ -32,6 +32,7 @@ mod cli {
     pub mod osquery;
     pub mod publish;
     pub mod secret;
+    pub mod user;
 }
 mod notification;
 mod polkit;
@@ -96,6 +97,8 @@ async fn main() -> Result<(), Report> {
         Commands::Nodes => cli::osquery::show_nodes(&config).await?,
         Commands::Query { query } => cli::osquery::query(&config, query).await?,
         Commands::Secret(args) => cli::secret::handle_secret_command(args, &config).await?,
+        Commands::User(args) => cli::user::handle_user_command(args, &config).await?,
+        Commands::Users => cli::user::list_users(&config).await?,
         Commands::Detach {
             version,
             darwin,
