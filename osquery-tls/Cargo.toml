@@ -5,6 +5,9 @@ edition.workspace = true
 repository.workspace = true
 license.workspace = true
 readme.workspace = true
+description = "osquery structs for the tls plugin"
+keywords = ["osquery"]
+categories = ["api-bindings"]
 
 [dependencies]
 indexmap = { version = "2.13.0", features = ["serde"] }

@@ -149,12 +149,11 @@ pub async fn auth_all_tag(
 ) -> Result<(), (StatusCode, String)> {
     if is_all_tag(&mut *conn, user).await.internal_server()? {
         return Ok(());
-    } else {
-        Err((
-            StatusCode::FORBIDDEN,
-            "You have no permission to access this resource".to_owned(),
-        ))
     }
+    Err((
+        StatusCode::FORBIDDEN,
+        "You have no permission to access this resource".to_owned(),
+    ))
 }
 
 pub async fn list_tags(

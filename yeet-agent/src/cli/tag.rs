@@ -105,7 +105,7 @@ pub async fn list_tags(config: &Config) -> Result<(), Report> {
     let tags = {
         let tags = api::tag::list_tags(&url, key).await?;
         tags.into_iter()
-            .map(|tag| (tag.to_string(), "".to_owned()))
+            .map(|tag| (tag.to_string(), String::new()))
             .collect()
     };
 

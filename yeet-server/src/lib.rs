@@ -102,7 +102,7 @@ fn routes(state: YeetState) -> axum::Router {
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .or_else(|_| tracing_subscriber::EnvFilter::try_new("yeetd=error,tower_http=warn"))
-                .unwrap(),
+                .expect("Could not init tracing logger"),
         )
         .try_init();
 

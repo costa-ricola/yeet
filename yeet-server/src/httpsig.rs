@@ -12,7 +12,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     YeetState, db,
-    error::{InternalError, WithStatusCode as _},
+    error::{InternalError as _, WithStatusCode as _},
 };
 
 pub struct HttpSig(pub VerifyingKey);

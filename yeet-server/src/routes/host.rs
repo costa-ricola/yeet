@@ -85,7 +85,7 @@ pub async fn update_hosts(
         let Ok(Some(host)) = db::hosts::host_by_hostname(&mut conn, host).await else {
             return Err((
                 StatusCode::BAD_REQUEST,
-                "Host `{host}` does not exist".to_string(),
+                "Host `{host}` does not exist".to_owned(),
             ));
         };
         db::tag::auth_tag(&mut conn, user, api::tag::Resource::from(host)).await?;

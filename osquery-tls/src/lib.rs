@@ -53,7 +53,7 @@ pub struct DistributedWriteRequest {
     pub node_key: Option<String>,
     pub queries: HashMap<String, Vec<IndexMap<String, String>>>,
     /// As of osquery version 2.1.2, the distributed write API includes a top-level statuses key.
-    /// These error codes correspond to SQLite error codes.
+    /// These error codes correspond to `SQLite` error codes.
     /// Consider non-0 values to indicate query execution failures.
     pub statuses: HashMap<String, u32>,
     /// Optional, return true to indicate re-enrollmen.

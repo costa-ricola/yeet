@@ -129,10 +129,7 @@ pub async fn query_write(
 
             for row in query {
                 for (column_name, value) in row {
-                    columns
-                        .entry(column_name)
-                        .or_insert_with(Vec::new)
-                        .push(value);
+                    columns.entry(column_name).or_default().push(value);
                 }
             }
             queries.insert(query_id, columns);

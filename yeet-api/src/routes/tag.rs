@@ -31,6 +31,7 @@ pub enum ResourceType {
 }
 
 impl ResourceType {
+    #[must_use]
     pub fn with_id(&self, id: i64) -> Resource {
         match self {
             ResourceType::Host => Resource::Host(HostID(id)),

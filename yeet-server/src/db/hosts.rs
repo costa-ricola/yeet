@@ -5,7 +5,7 @@ use jiff_sqlx::ToSqlx as _;
 use sqlx::Acquire as _;
 use sqlx::types::Json;
 
-use crate::db::{self};
+use crate::db;
 
 pub async fn fetch_provision_state(
     conn: &mut sqlx::SqliteConnection,

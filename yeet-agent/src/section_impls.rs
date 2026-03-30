@@ -1,13 +1,14 @@
-use colored::Colorize;
+use colored::Colorize as _;
 
 use crate::section::{DisplaySection, DisplaySectionItem};
 
+#[expect(clippy::unwrap_used)]
 impl DisplaySectionItem for api::Host {
     fn as_section_item(&self) -> (String, String) {
         let str = self.to_string();
-        let (l, r) = str.split_once(":").unwrap();
+        let (left, right) = str.split_once(':').unwrap();
 
-        (l.to_string(), r.trim().to_owned())
+        (left.to_owned(), right.trim().to_owned())
     }
 }
 
@@ -66,11 +67,12 @@ impl DisplaySection for api::Node {
     }
 }
 
+#[expect(clippy::unwrap_used)]
 impl DisplaySectionItem for api::User {
     fn as_section_item(&self) -> (String, String) {
         let str = self.to_string();
-        let (l, r) = str.split_once(":").unwrap();
+        let (left, right) = str.split_once(':').unwrap();
 
-        (l.to_string(), r.trim().to_owned())
+        (left.to_owned(), right.trim().to_owned())
     }
 }

@@ -98,3 +98,4 @@ as_conversions = "allow"
 pattern_type_mismatch = "allow" # I am too dumb for this
 verbose_file_reads = "allow"
 doc_paragraphs_missing_punctuation = "allow"
+field_scoped_visibility_modifiers = "allow"

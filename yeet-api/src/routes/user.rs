@@ -32,7 +32,7 @@ impl std::fmt::Display for AuthLevel {
             AuthLevel::Build => "Build".yellow(),
             AuthLevel::Osquery => "Osquery".blue(),
         };
-        write!(f, "{}", colored)
+        write!(f, "{colored}")
     }
 }
 

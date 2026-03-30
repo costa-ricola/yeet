@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs::File, io::Read as _, path::Path};
 
 use clap::{Args, Subcommand};
-use colored::Colorize;
+use colored::Colorize as _;
 use inquire::validator::Validation;
 use log::info;
 use rootcause::Report;
@@ -297,7 +297,7 @@ async fn tag(config: &Config) -> Result<(), Report> {
         .prompt()?;
 
     let tags = api::tag::list_tags(&url, key).await?;
-    let tags = inquire::MultiSelect::new(&format!("Which tags should be assigned?"), tags)
+    let tags = inquire::MultiSelect::new("Which tags should be assigned?", tags)
         .with_validator(
             |list: &[inquire::list_option::ListOption<&api::tag::Tag>]| {
                 if list.is_empty() {
@@ -355,7 +355,7 @@ async fn remove_tag(config: &Config) -> Result<(), Report> {
         tags.dedup();
         tags
     };
-    let tags = inquire::MultiSelect::new(&format!("Which tags should be removed?"), tags)
+    let tags = inquire::MultiSelect::new("Which tags should be removed?", tags)
         .with_validator(
             |list: &[inquire::list_option::ListOption<&api::tag::Tag>]| {
                 if list.is_empty() {

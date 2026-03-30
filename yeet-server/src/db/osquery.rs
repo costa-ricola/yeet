@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use sqlx::{Acquire, types::Json};
+use sqlx::{Acquire as _, types::Json};
 use uuid::Uuid;
 
 error_set::error_set! {
@@ -94,7 +94,7 @@ pub async fn get_query_response_all(
 }
 
 /// The node needs to provide the same content as the `osquery-enroll` secret
-/// As a response the ode receives an unique UUIDv7 this is the nodes `node_key`
+/// As a response the ode receives an unique `UUIDv7` this is the nodes `node_key`
 pub async fn enroll_node<I: age::Identity>(
     conn: &mut sqlx::SqliteConnection,
     store_key: &I,
@@ -112,7 +112,6 @@ pub async fn enroll_node<I: age::Identity>(
     let enroll_secret = age::decrypt(store_key, &enroll_secret)?;
 
     if Some(String::from_utf8_lossy(&enroll_secret).to_string()) != enroll_request.enroll_secret {
-        println!("secret mismatch");
         return Err(EnrollError::SecretMismatch);
     }
     let node_key = uuid::Uuid::now_v7();
@@ -185,7 +184,7 @@ pub async fn write_dquery_response(
         .await?;
 
     // TODO: sqlx in operator
-    for (query_id, response) in queries.into_iter() {
+    for (query_id, response) in queries {
         sqlx::query!(
             r#"DELETE FROM osquery_dq_requests WHERE node_id = $1 AND query_id = $2"#,
             node_id,
@@ -194,8 +193,8 @@ pub async fn write_dquery_response(
         .execute(&mut *tx)
         .await?;
 
-        let status = statuses.get(query_id).cloned().unwrap_or(0);
-        let response = serde_json::to_string(response).unwrap();
+        let status = statuses.get(query_id).copied().unwrap_or(0);
+        let response = serde_json::to_string(response).expect("Could not serialize a json");
         sqlx::query!(
             r#"INSERT INTO osquery_dq_responses (query_id, node_id, response, status)
             VALUES ($1,$2,$3,$4)"#,

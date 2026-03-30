@@ -43,7 +43,7 @@ pub fn time_diff(
     threshold: f64,
     smallest: jiff::Unit,
 ) -> String {
-    use colored::Colorize;
+    use colored::Colorize as _;
 
     let span = (timestamp - jiff::Timestamp::now())
         .round(
