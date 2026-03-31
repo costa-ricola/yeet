@@ -1,0 +1,20 @@
+[Unit]
+Description=Yeetd Server
+After=network.target
+Wants=network.target
+
+[Service]
+ExecStart=/usr/local/bin/yeetd
+DynamicUser=yes # implies ProtectSystem=strict ProtectHome=read-only PrivateTmp=yes RemoveIPC=yes
+WorkingDirectory=/var/lib/yeetd
+StateDirectory=yeetd
+Restart=on-failure
+Environment="YEET_PORT=4337"
+Environment="YEET_HOST=0.0.0.0"
+Environment="YEET_STATE=/var/lib/yeetd/yeetd.db"
+Environment="YEET_CERT="
+Environment="YEET_CERT_KEY="
+# Environment="YEET_INIT_KEY="
+
+[Install]
+WantedBy=multi-user.target

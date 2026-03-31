@@ -27,7 +27,7 @@ in
 
     user = mkOption {
       type = types.str;
-      default = "yeet";
+      default = "yeetd";
       description = ''
         User to run the Yeet Server as.
       '';
