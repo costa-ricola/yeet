@@ -53,6 +53,16 @@ rec {
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
+    "splunk_hec" = rec {
+      packageId = "splunk_hec";
+      build = internal.buildRustCrateWithFeatures {
+        packageId = "splunk_hec";
+      };
+
+      # Debug support which might change between releases.
+      # File a bug if you depend on any for non-debug work!
+      debug = internal.debugCrate { inherit packageId; };
+    };
     "yeet" = rec {
       packageId = "yeet";
       build = internal.buildRustCrateWithFeatures {
@@ -13758,6 +13768,46 @@ rec {
         };
         resolvedDefaultFeatures = [ "alloc" "pem" "std" ];
       };
+      "splunk_hec" = rec {
+        crateName = "splunk_hec";
+        version = "0.9.1";
+        edition = "2024";
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./splunk_hec; };
+        dependencies = [
+          {
+            name = "indexmap";
+            packageId = "indexmap";
+            features = [ "serde" ];
+          }
+          {
+            name = "reqwest";
+            packageId = "reqwest";
+            features = [ "json" ];
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+            features = [ "derive" ];
+          }
+          {
+            name = "serde_json";
+            packageId = "serde_json";
+          }
+          {
+            name = "url";
+            packageId = "url";
+            features = [ "serde" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "full" ];
+          }
+        ];
+
+      };
       "sqlx" = rec {
         crateName = "sqlx";
         version = "0.8.6";
@@ -21692,7 +21742,7 @@ rec {
       };
       "yeet" = rec {
         crateName = "yeet";
-        version = "0.9.0";
+        version = "0.9.1";
         edition = "2024";
         crateBin = [
           {
@@ -21860,7 +21910,7 @@ rec {
       };
       "yeet-api" = rec {
         crateName = "yeet-api";
-        version = "0.9.0";
+        version = "0.9.1";
         edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./yeet-api; };
         libName = "yeet_api";
@@ -21967,7 +22017,7 @@ rec {
       };
       "yeetd" = rec {
         crateName = "yeetd";
-        version = "0.9.0";
+        version = "0.9.1";
         edition = "2024";
         crateBin = [
           {
