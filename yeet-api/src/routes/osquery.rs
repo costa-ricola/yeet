@@ -39,6 +39,7 @@ pub struct QueryFulfillment {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QueryResponse {
     pub node: NodeID,
+    /// Query as colum -> row values
     pub response: IndexMap<String, Vec<String>>,
     pub status: i64,
 }

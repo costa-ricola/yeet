@@ -27,7 +27,7 @@ impl SplunkConfig {
     pub async fn send_msg(
         &self,
         msg: SplunkMessageType,
-        time: i64,
+        time: jiff::Timestamp,
     ) -> Result<reqwest::Response, reqwest::Error> {
         let msg = SplunkMessage {
             time,
@@ -47,7 +47,7 @@ impl SplunkConfig {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SplunkMessage {
-    time: i64,
+    time: jiff::Timestamp,
     /// Yeet Server
     host: String,
     index: String,
@@ -69,8 +69,8 @@ pub enum SplunkMessageType {
         nodes: Vec<String>,
         /// Yeet user that created the query
         user: String,
-        /// Yeet version
-        version: String,
+        // Yeet version
+        // version: String,
     },
     QueryResponse {
         /// Corresponding `QueryJob`
@@ -80,5 +80,7 @@ pub enum SplunkMessageType {
         /// The query output in a row based table
         /// Each Vec element is a row and the Map is column name -> value
         response: Vec<IndexMap<String, String>>,
+        /// SQLite Status of the response. If it is non 0 `response` will be empty
+        sqlite_status: i64,
     },
 }

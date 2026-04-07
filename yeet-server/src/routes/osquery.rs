@@ -34,11 +34,13 @@ pub async fn create_query(
     let mut conn = state.pool.acquire().await.internal_server()?;
     db::tag::auth_osquery(&mut conn, user).await?;
     db::tag::auth_all_tag(&mut conn, user).await?;
-    Ok(Json(
-        db::osquery::create_query(&mut conn, user, query.sql)
-            .await
-            .internal_server()?,
-    ))
+    let query_id = db::osquery::create_query(&mut conn, user, query.sql)
+        .await
+        .internal_server()?;
+
+    crate::wake_splunk(state.sender.as_ref()).await;
+
+    Ok(Json(query_id))
 }
 
 pub async fn query_response_all(
@@ -125,17 +127,11 @@ pub async fn query_write(
         node_key
     };
 
+    // transform from row to column based
     let queries = {
         let mut queries = HashMap::new();
         for (query_id, query) in request.queries {
-            let mut columns: IndexMap<String, Vec<String>> = IndexMap::new();
-
-            for row in query {
-                for (column_name, value) in row {
-                    columns.entry(column_name).or_default().push(value);
-                }
-            }
-            queries.insert(query_id, columns);
+            queries.insert(query_id, row_to_column(query));
         }
         queries
     };
@@ -145,11 +141,64 @@ pub async fn query_write(
     else {
         return Json(query_write_failure());
     };
+
+    crate::wake_splunk(state.sender.as_ref()).await;
     Json(response)
 }
 
 fn query_write_failure() -> osquery_tls::DistributedWriteResponse {
     osquery_tls::DistributedWriteResponse {
         node_invalid: Some(true),
+    }
+}
+// by row: `Vec<IndexMap<String, String>>` e.g. [{"clm1": "val1", "clm2":"val1"},{"clm1": "val2", "clm2":"val2"}]
+// by column: `IndexMap<String, Vec<String>>` e.g. {"clm1": ["val1","val2"],"clm2": ["val1","val2"]}
+
+pub(crate) fn row_to_column(rows: Vec<IndexMap<String, String>>) -> IndexMap<String, Vec<String>> {
+    let mut columns: IndexMap<String, Vec<String>> = IndexMap::new();
+
+    for row in rows.into_iter() {
+        for (column_name, value) in row {
+            columns.entry(column_name).or_default().push(value);
+        }
+    }
+    columns
+}
+
+pub(crate) fn column_to_row(
+    columns: IndexMap<String, Vec<String>>,
+) -> Vec<IndexMap<String, String>> {
+    let mut rows: Vec<IndexMap<String, String>> = Vec::new();
+
+    let max_rows = columns.values().map(|v| v.len()).max().unwrap_or(0);
+
+    for row_idx in 0..max_rows {
+        let mut row: IndexMap<String, String> = IndexMap::new();
+        for (column_name, values) in &columns {
+            if let Some(value) = values.get(row_idx) {
+                row.insert(column_name.clone(), value.clone());
+            }
+        }
+        rows.push(row);
+    }
+
+    rows
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indexmap::indexmap;
+
+    #[test]
+    fn table_conversion() {
+        let rows = vec![
+            indexmap! { "id".to_string() => "1".to_string(), "name".to_string() => "Alice".to_string() },
+            indexmap! { "id".to_string() => "2".to_string(), "name".to_string() => "Bob".to_string() },
+        ];
+
+        let columns = row_to_column(rows.clone());
+        let rows_converted = column_to_row(columns);
+        assert_eq!(rows, rows_converted);
     }
 }

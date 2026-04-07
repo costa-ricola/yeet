@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
+use jiff_sqlx::ToSqlx;
 use sqlx::{Acquire as _, types::Json};
 use uuid::Uuid;
 
@@ -37,16 +38,20 @@ pub async fn create_query(
 ) -> Result<api::QueryID, sqlx::Error> {
     let mut tx = conn.begin().await?;
 
+    let now = jiff::Timestamp::now().to_sqlx();
     let query_id = sqlx::query!(
-        r#"INSERT INTO osquery_dq_queries (query,user_id) VALUES ($1,$2) "#,
+        r#"INSERT INTO osquery_dq_queries (query,user_id,splunk_status,creation_time) VALUES ($1,$2,$3,$4)"#,
         query,
-        user
+        user,
+        crate::splunk_sender::SplunkStatus::NotSent,
+        now
     )
     .execute(&mut *tx)
     .await?
     .last_insert_rowid();
 
     // TODO: no loop
+    // TODO: what if no nodes
 
     let nodes = sqlx::query_scalar!(r#"SELECT id FROM osquery_nodes"#)
         .fetch_all(&mut *tx)
@@ -195,13 +200,16 @@ pub async fn write_dquery_response(
 
         let status = statuses.get(query_id).copied().unwrap_or(0);
         let response = serde_json::to_string(response).expect("Could not serialize a json");
+        let now = jiff::Timestamp::now().to_sqlx();
         sqlx::query!(
-            r#"INSERT INTO osquery_dq_responses (query_id, node_id, response, status)
-            VALUES ($1,$2,$3,$4)"#,
+            r#"INSERT INTO osquery_dq_responses (query_id, node_id, response, status, splunk_status, response_time)
+            VALUES ($1,$2,$3,$4,$5,$6)"#,
             query_id,
             node_id,
             response,
-            status
+            status,
+            crate::splunk_sender::SplunkStatus::NotSent,
+            now
         )
         .execute(&mut *tx)
         .await?;

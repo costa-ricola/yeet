@@ -36,6 +36,7 @@ ed25519-dalek = { workspace = true, features = ["serde", "rand_core", "std", "pe
 thiserror.workspace = true
 serde_json_any_key.workspace = true
 osquery-tls.workspace = true
+splunk_hec.workspace = true
 jiff-sqlx = { version = "0.1.1", features = ["sqlite"] }
 sqlx = { version = "0.8.6", features = ["json", "runtime-tokio", "sqlite", "uuid"] }
 futures = "0.3.32"
