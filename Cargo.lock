@@ -6062,6 +6062,7 @@ dependencies = [
  "indexmap",
  "jiff",
  "jiff-sqlx",
+ "log",
  "memmap2",
  "mime",
  "osquery-tls",

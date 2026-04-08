@@ -30,7 +30,7 @@ impl SplunkConfig {
         time: jiff::Timestamp,
     ) -> Result<reqwest::Response, reqwest::Error> {
         let msg = SplunkMessage {
-            time,
+            time: time.as_nanosecond(),
             host: self.yeet_server.to_string(),
             index: self.index.clone(),
             sourcetype: self.sourcetype.clone(),
@@ -47,7 +47,7 @@ impl SplunkConfig {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SplunkMessage {
-    time: jiff::Timestamp,
+    time: i128,
     /// Yeet Server
     host: String,
     index: String,

@@ -41,6 +41,7 @@ osquery-tls = {path = "./osquery-tls"}
 colored = "3.1.1"
 tabled = "0.20.0"
 splunk_hec = {path = "./splunk_hec"}
+log = "0.4"
 
 
 [workspace.lints.rust]

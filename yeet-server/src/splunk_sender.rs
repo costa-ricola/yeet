@@ -18,7 +18,9 @@ pub async fn run(
     mut receiver: tokio::sync::mpsc::Receiver<()>,
     pool: sqlx::SqlitePool,
 ) -> Result<(), sqlx::Error> {
+    log::info!("Waiting for splunk ping");
     while let Some(()) = receiver.recv().await {
+        log::info!("Sending logs to splunk");
         let mut conn = pool.acquire().await?;
 
         send_queries(&mut conn, &config).await?;
@@ -51,6 +53,8 @@ async fn send_responses(
     .fetch_all(&mut *conn)
     .await?;
 
+    log::info!("Sending {} responses", unsent_dq_responses.len());
+
     for node_response in unsent_dq_responses {
         let columns: IndexMap<String, Vec<String>> =
             serde_json::from_str(&node_response.response).unwrap_or_default();
@@ -78,6 +82,8 @@ async fn send_responses(
             )
             .execute(&mut *conn)
             .await?;
+        } else {
+            log::error!("Failed to send splunk logs: {}", response.unwrap_err())
         }
     }
     Ok(())
@@ -109,6 +115,8 @@ async fn send_queries(
     .fetch_all(&mut *conn)
     .await?;
 
+    log::info!("Sending {} queries", unsent_dq_queries.len());
+
     for query in unsent_dq_queries {
         let response = config
             .send_msg(
@@ -132,6 +140,8 @@ async fn send_queries(
             )
             .execute(&mut *conn)
             .await?;
+        } else {
+            log::error!("Failed to send splunk logs: {}", response.unwrap_err())
         }
     }
     Ok(())
