@@ -70,8 +70,9 @@ pub enum SplunkMessageType {
         nodes: Vec<String>,
         /// Yeet user that created the query
         user: String,
-        // Yeet version
-        // version: String,
+        /// actual query that is sent to the nodes
+        query: String, // Yeet version
+                       // version: String,
     },
     QueryResponse {
         /// Corresponding `QueryJob`
@@ -81,7 +82,7 @@ pub enum SplunkMessageType {
         /// The query output in a row based table
         /// Each Vec element is a row and the Map is column name -> value
         response: Vec<IndexMap<String, String>>,
-        /// SQLite Status of the response. If it is non 0 `response` will be empty
-        sqlite_status: i64,
+        /// "SQLite" (osquery) Status of the response. If it is non 0 `response` will be empty
+        status: i64,
     },
 }

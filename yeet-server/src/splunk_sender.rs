@@ -65,7 +65,7 @@ async fn send_responses(
                     sid: node_response.query_id,
                     hostname: node_response.host_identifier,
                     response: crate::routes::osquery::column_to_row(columns),
-                    sqlite_status: node_response.status,
+                    status: node_response.status,
                 },
                 node_response.response_time.to_jiff(),
             )
@@ -98,6 +98,7 @@ async fn send_queries(
         r#"
         SELECT
             q.id,
+            q.query,
             u.username,
             q.creation_time as "creation_time: jiff_sqlx::Timestamp",
             json_group_array(
@@ -122,6 +123,7 @@ async fn send_queries(
             .send_msg(
                 splunk_hec::SplunkMessageType::QueryJob {
                     sid: query.id,
+                    query: query.query,
                     nodes: query.nodes.0,
                     user: query.username,
                 },
