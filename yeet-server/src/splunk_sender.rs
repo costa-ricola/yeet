@@ -18,19 +18,34 @@ pub async fn run(
     mut receiver: tokio::sync::mpsc::Receiver<()>,
     pool: sqlx::SqlitePool,
 ) -> Result<(), sqlx::Error> {
-    log::info!("Waiting for splunk ping");
     while let Some(()) = receiver.recv().await {
-        log::info!("Sending logs to splunk");
         let mut conn = pool.acquire().await?;
 
-        send_queries(&mut conn, &config).await?;
-        send_responses(&mut conn, &config).await?;
-        delete_sent(&mut conn).await?;
+        let s_q = send_queries(&mut conn, &config).await?;
+        let s_r = send_responses(&mut conn, &config).await?;
+        let d_r = delete_responses(&mut conn).await?;
+        let d_q = delete_queries(&mut conn).await?;
+
+        log::info!(
+            "SPLUNK SYNC
+                 Sent Queries: {}/{}(OK)/{}(ERR)
+               Sent Responses: {}/{}(OK)/{}(ERR)
+            Deleted Responses: {}
+              Deleted Queries: {}",
+            s_q.0,
+            s_q.1,
+            s_q.0 - s_q.1,
+            s_r.0,
+            s_r.1,
+            s_r.0 - s_r.1,
+            d_r,
+            d_q
+        );
     }
     Ok(())
 }
 
-async fn delete_sent(conn: &mut sqlx::SqliteConnection) -> Result<(), sqlx::Error> {
+async fn delete_responses(conn: &mut sqlx::SqliteConnection) -> Result<u64, sqlx::Error> {
     let deleted_responses = sqlx::query!(
         r#"
         DELETE FROM osquery_dq_responses
@@ -43,8 +58,9 @@ async fn delete_sent(conn: &mut sqlx::SqliteConnection) -> Result<(), sqlx::Erro
     .execute(&mut *conn)
     .await?;
 
-    log::info!("Deleted {} responses", deleted_responses.rows_affected());
-
+    Ok(deleted_responses.rows_affected())
+}
+async fn delete_queries(conn: &mut sqlx::SqliteConnection) -> Result<u64, sqlx::Error> {
     let queries = sqlx::query!(
         r#"
         DELETE FROM osquery_dq_queries
@@ -62,16 +78,14 @@ async fn delete_sent(conn: &mut sqlx::SqliteConnection) -> Result<(), sqlx::Erro
     .execute(conn)
     .await?;
 
-    log::info!("Deleted {} queries", queries.rows_affected());
-
-    Ok(())
+    Ok(queries.rows_affected())
 }
 
 /// Send all `osquery_dq_responses` with state `SplunkStatus::NotSent` to splunk
 async fn send_responses(
     conn: &mut sqlx::SqliteConnection,
     config: &splunk_hec::SplunkConfig,
-) -> Result<(), sqlx::Error> {
+) -> Result<(u64, u64), sqlx::Error> {
     let unsent_dq_responses = sqlx::query!(
         r#"
         SELECT
@@ -90,7 +104,9 @@ async fn send_responses(
     .fetch_all(&mut *conn)
     .await?;
 
-    log::info!("Sending {} responses", unsent_dq_responses.len());
+    let all = unsent_dq_responses.len() as u64;
+
+    let mut successful = 0;
 
     for node_response in unsent_dq_responses {
         let rows = {
@@ -126,18 +142,19 @@ async fn send_responses(
             )
             .execute(&mut *conn)
             .await?;
+            successful += 1;
         } else {
             log::error!("Failed to send splunk logs: {}", response.unwrap_err())
         }
     }
-    Ok(())
+    Ok((all, successful))
 }
 
 /// Send all `osquery_dq_queries` with state `SplunkStatus::NotSent` to splunk
 async fn send_queries(
     conn: &mut sqlx::SqliteConnection,
     config: &splunk_hec::SplunkConfig,
-) -> Result<(), sqlx::Error> {
+) -> Result<(u64, u64), sqlx::Error> {
     let unsent_dq_queries = sqlx::query!(
         r#"
         SELECT
@@ -160,7 +177,8 @@ async fn send_queries(
     .fetch_all(&mut *conn)
     .await?;
 
-    log::info!("Sending {} queries", unsent_dq_queries.len());
+    let all = unsent_dq_queries.len() as u64;
+    let mut successfull = 0;
 
     for query in unsent_dq_queries {
         let response = config
@@ -186,9 +204,10 @@ async fn send_queries(
             )
             .execute(&mut *conn)
             .await?;
+            successfull += 1;
         } else {
             log::error!("Failed to send splunk logs: {}", response.unwrap_err())
         }
     }
-    Ok(())
+    Ok((all, successfull))
 }
