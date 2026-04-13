@@ -65,12 +65,12 @@ async fn send_responses(
         let mut query_rows = Vec::new();
 
         for row in rows {
-            let row = splunk_hec::SplunkMessageType::QueryRow {
-                osquery_sid: node_response.query_id,
-                osquery_hostname: node_response.host_identifier.clone(),
+            let row = splunk_hec::SplunkMessageType::response(
+                node_response.query_id,
+                node_response.host_identifier.clone(),
+                node_response.status,
                 row,
-                osquery_status: node_response.status,
-            };
+            );
             query_rows.push(row);
         }
 
@@ -128,12 +128,12 @@ async fn send_queries(
     for query in unsent_dq_queries {
         let response = config
             .send_msgs(
-                vec![splunk_hec::SplunkMessageType::QueryJob {
-                    sid: query.id,
-                    query: query.query,
-                    nodes: query.nodes.0,
-                    user: query.username,
-                }],
+                vec![splunk_hec::SplunkMessageType::query(
+                    query.id,
+                    query.nodes.0,
+                    query.username,
+                    query.query,
+                )],
                 query.creation_time.to_jiff(),
             )
             .await;
