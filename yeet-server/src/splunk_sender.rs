@@ -25,8 +25,45 @@ pub async fn run(
 
         send_queries(&mut conn, &config).await?;
         send_responses(&mut conn, &config).await?;
-        // TODO: delete non persistent which were sent
+        delete_sent(&mut conn).await?;
     }
+    Ok(())
+}
+
+async fn delete_sent(conn: &mut sqlx::SqliteConnection) -> Result<(), sqlx::Error> {
+    let deleted_responses = sqlx::query!(
+        r#"
+        DELETE FROM osquery_dq_responses
+        WHERE query_id IN (
+            SELECT id FROM osquery_dq_queries
+            WHERE persistent = 0
+        ) AND splunk_status = $1"#,
+        SplunkStatus::Sent
+    )
+    .execute(&mut *conn)
+    .await?;
+
+    log::info!("Deleted {} responses", deleted_responses.rows_affected());
+
+    let queries = sqlx::query!(
+        r#"
+        DELETE FROM osquery_dq_queries
+        WHERE id IN (
+            SELECT odq.id FROM osquery_dq_queries odq
+            LEFT JOIN osquery_dq_requests ore on ore.query_id = odq.id
+            LEFT JOIN osquery_dq_responses odr on odr.query_id = odq.id
+            WHERE odq.splunk_status = $1
+            AND persistent = 0
+            AND odr.id IS NULL
+            AND ore.query_id IS NULL
+        )"#,
+        SplunkStatus::Sent
+    )
+    .execute(conn)
+    .await?;
+
+    log::info!("Deleted {} queries", queries.rows_affected());
+
     Ok(())
 }
 
