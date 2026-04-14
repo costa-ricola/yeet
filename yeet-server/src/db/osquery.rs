@@ -95,6 +95,17 @@ pub async fn enroll_node<I: age::Identity>(
     if Some(String::from_utf8_lossy(&enroll_secret).to_string()) != enroll_request.enroll_secret {
         return Err(EnrollError::SecretMismatch);
     }
+
+    let existing_key = sqlx::query_scalar!(
+        r#"SELECT node_key as "node_key: uuid::Uuid" FROM osquery_nodes WHERE host_identifier = $1"#,
+        enroll_request.host_identifier
+            )
+    .fetch_optional(&mut *conn).await?;
+
+    if let Some(key) = existing_key {
+        return Ok(key);
+    }
+
     let node_key = uuid::Uuid::now_v7();
     let details = Json::from(enroll_request.host_details);
 
@@ -157,7 +168,7 @@ pub async fn write_dquery_response(
     node: &uuid::Uuid,
     queries: &HashMap<String, IndexMap<String, Vec<String>>>,
     statuses: &HashMap<String, u32>,
-) -> Result<osquery_tls::DistributedWriteResponse, DWriteError> {
+) -> Result<osquery_tls::EmptyResponse, DWriteError> {
     let mut tx = conn.begin().await?;
 
     let node_id = sqlx::query_scalar!(r#"SELECT id FROM osquery_nodes WHERE node_key = $1"#, node)
@@ -192,7 +203,7 @@ pub async fn write_dquery_response(
     }
 
     tx.commit().await?;
-    Ok(osquery_tls::DistributedWriteResponse { node_invalid: None })
+    Ok(osquery_tls::EmptyResponse::valid())
 }
 
 #[cfg(test)]

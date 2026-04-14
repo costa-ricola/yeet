@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT node_key as \"node_key: uuid::Uuid\" FROM osquery_nodes WHERE host_identifier = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "node_key: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "817dea1cd2961af2ed310c9e115c15b74fcc4732f0e6fde50a6d5ae60a1ffc2a"
+}

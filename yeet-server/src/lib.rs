@@ -187,14 +187,11 @@ fn routes(state: YeetState) -> axum::Router {
         .route("/osquery/enroll", post(osquery::enroll))
         .route("/osquery/query/read", post(osquery::query_read))
         .route("/osquery/query/write", post(osquery::query_write))
+        .route("/osquery/config", post(osquery::config))
+        .route("/osquery/log", post(osquery::log))
         // === Osquery
         .route("/osquery/nodes", get(osquery::list_nodes))
         .route("/osquery/query/create", post(osquery::create_query))
-        // query status
-        // .route(
-        // "/osquery/query/response/{query_id}/{node_id}",
-        // get(osquery::query_write),
-        // )
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(state)
 }

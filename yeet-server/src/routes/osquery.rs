@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, os};
 
 use axum::{Json, extract::State, http::StatusCode};
 use indexmap::IndexMap;
@@ -66,7 +66,7 @@ fn enroll_failure() -> osquery_tls::EnrollmentResponse {
 
 pub async fn query_read(
     State(state): State<YeetState>,
-    Json(request): Json<osquery_tls::DistributedReadRequest>,
+    Json(request): Json<osquery_tls::NodeKey>,
 ) -> Json<osquery_tls::DistributedReadResponse> {
     let Ok(mut conn) = state.pool.acquire().await else {
         return Json(query_read_failure());
@@ -95,14 +95,14 @@ fn query_read_failure() -> osquery_tls::DistributedReadResponse {
 pub async fn query_write(
     State(state): State<YeetState>,
     Json(request): Json<osquery_tls::DistributedWriteRequest>,
-) -> Json<osquery_tls::DistributedWriteResponse> {
+) -> Json<osquery_tls::EmptyResponse> {
     let Ok(mut conn) = state.pool.acquire().await else {
-        return Json(query_write_failure());
+        return Json(osquery_tls::EmptyResponse::invalid());
     };
     let node_key = {
         let node_key = request.node_key.and_then(|key| key.parse().ok());
         let Some(node_key) = node_key else {
-            return Json(query_write_failure());
+            return Json(osquery_tls::EmptyResponse::invalid());
         };
         node_key
     };
@@ -119,18 +119,40 @@ pub async fn query_write(
     let Ok(response) =
         db::osquery::write_dquery_response(&mut conn, &node_key, &queries, &request.statuses).await
     else {
-        return Json(query_write_failure());
+        return Json(osquery_tls::EmptyResponse::invalid());
     };
 
     crate::wake_splunk(state.sender.as_ref()).await;
     Json(response)
 }
 
-fn query_write_failure() -> osquery_tls::DistributedWriteResponse {
-    osquery_tls::DistributedWriteResponse {
-        node_invalid: Some(true),
-    }
+pub async fn config(
+    State(state): State<YeetState>,
+    Json(request): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    log::info!(
+        "Received config request:\n{}",
+        serde_json::to_string_pretty(&request).unwrap()
+    );
+    Json(serde_json::json!({
+        "packs":{
+            "pack": "/some/pack",
+            "*":"all my packs"
+        }
+    }))
 }
+
+pub async fn log(
+    State(state): State<YeetState>,
+    Json(request): Json<serde_json::Value>,
+) -> Json<osquery_tls::EmptyResponse> {
+    log::info!(
+        "Received RemoteLog:\n{}",
+        serde_json::to_string_pretty(&request).unwrap()
+    );
+    Json(osquery_tls::EmptyResponse::valid())
+}
+
 // by row: `Vec<IndexMap<String, String>>` e.g. [{"clm1": "val1", "clm2":"val1"},{"clm1": "val2", "clm2":"val2"}]
 // by column: `IndexMap<String, Vec<String>>` e.g. {"clm1": ["val1","val2"],"clm2": ["val1","val2"]}
 

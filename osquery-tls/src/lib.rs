@@ -35,11 +35,6 @@ pub struct EnrollmentResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DistributedReadRequest {
-    pub node_key: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 /// TODO: Discovery queries on distributed queries
 pub struct DistributedReadResponse {
     pub queries: HashMap<String, String>,
@@ -62,8 +57,56 @@ pub struct DistributedWriteRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DistributedWriteResponse {
-    pub node_invalid: Option<bool>,
+pub struct NodeKey {
+    pub node_key: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EmptyResponse {
+    node_invalid: bool,
+}
+
+impl EmptyResponse {
+    pub fn valid() -> Self {
+        Self {
+            node_invalid: false,
+        }
+    }
+    pub fn invalid() -> Self {
+        Self { node_invalid: true }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RemoteLoggingRequest {
+    pub node_key: Option<String>,
+    pub data: LogType,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[serde(tag = "log_type", content = "data")]
+pub enum LogType {
+    Result(Vec<serde_json::Value>),
+    Status(Vec<serde_json::Value>),
+}
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusLog {
+    /// e.g. "Fri Mar 27 15:42:13 2026 UTC"
+    pub calendar_time: String,
+    /// e.g. tls_enroll.cpp
+    pub filename: String,
+    pub host_identifier: String,
+    pub line: u32,
+    /// e.g. "Failed enrollment request to..."
+    pub message: String,
+    /// e.g. 2 (maybe an u16)
+    pub severity: i32,
+    /// e.g. 1775122921
+    pub unix_time: u64,
+    /// e.g. 5.21.0
+    pub version: String,
 }
 
 #[cfg(test)]
