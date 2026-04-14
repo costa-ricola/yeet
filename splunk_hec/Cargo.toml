@@ -16,6 +16,7 @@ serde_json.workspace = true
 reqwest.workspace = true
 url.workspace = true
 jiff.workspace = true
+log.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1.49", features = ["full"] }

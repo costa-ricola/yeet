@@ -28,10 +28,10 @@ pub async fn run(
 
         log::info!(
             "SPLUNK SYNC
-                 Sent Queries: {}/{}(OK)/{}(ERR)
-               Sent Responses: {}/{}(OK)/{}(ERR)
-            Deleted Responses: {}
-              Deleted Queries: {}",
+      Sent Queries: {}/{}(OK)/{}(ERR)
+    Sent Responses: {}/{}(OK)/{}(ERR)
+ Deleted Responses: {}
+   Deleted Queries: {}",
             s_q.0,
             s_q.1,
             s_q.0.saturating_sub(s_q.1),

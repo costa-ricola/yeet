@@ -41,6 +41,12 @@ impl SplunkConfig {
             events.push(msg);
         }
 
+        // TODO only serialize if debugging enabled
+        match serde_json::to_string_pretty(&events) {
+            Ok(json) => log::debug!("Sending message to splunk: {json}"),
+            Err(err) => log::error!("Could not serialize splunk message: {err}"),
+        }
+
         self.reqwest_client
             .post(self.server.as_str())
             .json(&events)
