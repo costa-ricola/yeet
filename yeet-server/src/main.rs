@@ -4,6 +4,7 @@ use std::{
     env,
     fs::{File, read_to_string},
     io::Write as _,
+    path::Path,
     str::FromStr as _,
 };
 
@@ -65,6 +66,11 @@ async fn main() {
         ))
     };
 
+    let packs = {
+        let env = env::var("YEET_OSQUERY_PACKS").ok();
+        env.map(|env| Path::new(&env).to_path_buf())
+    };
+
     let options = SqliteConnectOptions::new()
         .filename("yeet.db")
         .create_if_missing(true);
@@ -74,6 +80,6 @@ async fn main() {
         .await
         .expect("Can't connect to yeet.db");
 
-    let handle = yeetd::launch(port, host, pool, age_key, Some(tls), splunk).await;
+    let handle = yeetd::launch(port, host, pool, age_key, Some(tls), splunk, packs).await;
     handle.await.expect("axum quit");
 }

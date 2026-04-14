@@ -135,10 +135,7 @@ pub async fn config(
         serde_json::to_string_pretty(&request).unwrap()
     );
     Json(serde_json::json!({
-        "packs":{
-            "pack": "/some/pack",
-            "*":"all my packs"
-        }
+        "packs": state.osquery_packs
     }))
 }
 
@@ -150,6 +147,11 @@ pub async fn log(
         "Received RemoteLog:\n{}",
         serde_json::to_string_pretty(&request).unwrap()
     );
+    let remote_log = serde_json::from_value::<osquery_tls::RemoteLoggingRequest>(request);
+    match remote_log {
+        Ok(_) => log::info!("Deserialized RemoteLogging without issues"),
+        Err(err) => log::error!("Could not deserialize remoteLog:\n{}", err),
+    }
     Json(osquery_tls::EmptyResponse::valid())
 }
 

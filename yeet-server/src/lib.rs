@@ -1,4 +1,12 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{self},
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
+};
 
 use axum::routing::{delete, get, post, put};
 
@@ -27,6 +35,7 @@ mod splunk_sender;
 
 use axum_server::tls_rustls::RustlsConfig;
 use ed25519_dalek::VerifyingKey;
+use indexmap::IndexMap;
 pub(crate) use routes::{host, key, secret, system, verify};
 
 #[derive(Clone)]
@@ -34,6 +43,7 @@ struct YeetState {
     pub pool: sqlx::SqlitePool,
     pub age_key: Arc<age::x25519::Identity>,
     pub sender: Option<tokio::sync::mpsc::Sender<()>>,
+    pub osquery_packs: IndexMap<String, serde_json::Value>,
 }
 
 use serde::{Deserialize, Serialize};
@@ -56,6 +66,7 @@ pub async fn launch<I: Into<std::net::IpAddr>>(
     age_key: age::x25519::Identity,
     tls: Option<RustlsConfig>,
     splunk: Option<splunk_hec::SplunkConfig>,
+    osquery_packs: Option<PathBuf>,
 ) -> tokio::task::JoinHandle<()> {
     #[expect(clippy::unwrap_used)]
     {
@@ -91,11 +102,15 @@ pub async fn launch<I: Into<std::net::IpAddr>>(
     } else {
         None
     };
+    let osquery_packs = osquery_packs
+        .map(|path| get_osquery_packs(path).expect("Could not retrive packs"))
+        .unwrap_or_default();
 
     let state = YeetState {
         pool,
         age_key,
         sender,
+        osquery_packs,
     };
 
     // wake the splunk sender immediately so that he can send all logs
@@ -201,6 +216,25 @@ pub(crate) async fn wake_splunk(sender: Option<&tokio::sync::mpsc::Sender<()>>) 
         // TODO: log if we could not notify
         let _ignore = sender.send_timeout((), Duration::from_secs(1)).await;
     }
+}
+
+/// Read all files in a directory to json
+fn get_osquery_packs(path: PathBuf) -> Result<IndexMap<String, serde_json::Value>, io::Error> {
+    let mut packs = IndexMap::new();
+    for path in path.read_dir()? {
+        let path = path?;
+        let Ok(pack) = serde_json::from_reader::<_, serde_json::Value>(File::open(path.path())?)
+        else {
+            log::warn!(
+                "Pack `{}` not ingested - not valid json",
+                path.path().display()
+            );
+            continue;
+        };
+        packs.insert(path.file_name().to_string_lossy().to_string(), pack);
+    }
+
+    Ok(packs)
 }
 
 #[cfg(test)]
