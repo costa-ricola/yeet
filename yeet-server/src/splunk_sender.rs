@@ -34,10 +34,10 @@ pub async fn run(
               Deleted Queries: {}",
             s_q.0,
             s_q.1,
-            s_q.0 - s_q.1,
+            s_q.0.saturating_sub(s_q.1),
             s_r.0,
             s_r.1,
-            s_r.0 - s_r.1,
+            s_r.0.saturating_sub(s_r.1),
             d_r,
             d_q
         );
@@ -106,13 +106,13 @@ async fn send_responses(
 
     let all = unsent_dq_responses.len() as u64;
 
-    let mut successful = 0;
+    let mut successfull: u64 = 0;
 
     for node_response in unsent_dq_responses {
         let rows = {
             let columns: IndexMap<String, Vec<String>> =
                 serde_json::from_str(&node_response.response).unwrap_or_default();
-            crate::routes::osquery::column_to_row(columns)
+            crate::routes::osquery::column_to_row(&columns)
         };
 
         let mut query_rows = Vec::new();
@@ -132,7 +132,9 @@ async fn send_responses(
             .await;
 
         // only update that it was sent if it was sent successfull
-        if response.is_ok() {
+        if let Err(err) = response {
+            log::error!("Failed to send splunk logs: {err}");
+        } else {
             sqlx::query!(
                 r#"UPDATE osquery_dq_responses
                 SET splunk_status = $1
@@ -142,12 +144,10 @@ async fn send_responses(
             )
             .execute(&mut *conn)
             .await?;
-            successful += 1;
-        } else {
-            log::error!("Failed to send splunk logs: {}", response.unwrap_err())
+            successfull = successfull.saturating_add(1);
         }
     }
-    Ok((all, successful))
+    Ok((all, successfull))
 }
 
 /// Send all `osquery_dq_queries` with state `SplunkStatus::NotSent` to splunk
@@ -178,7 +178,7 @@ async fn send_queries(
     .await?;
 
     let all = unsent_dq_queries.len() as u64;
-    let mut successfull = 0;
+    let mut successfull: u64 = 0;
 
     for query in unsent_dq_queries {
         let response = config
@@ -194,7 +194,9 @@ async fn send_queries(
             .await;
 
         // only update that it was sent if it was sent successfull
-        if response.is_ok() {
+        if let Err(err) = response {
+            log::error!("Failed to send splunk logs: {err}");
+        } else {
             sqlx::query!(
                 r#"UPDATE osquery_dq_queries
                 SET splunk_status = $1
@@ -204,9 +206,7 @@ async fn send_queries(
             )
             .execute(&mut *conn)
             .await?;
-            successfull += 1;
-        } else {
-            log::error!("Failed to send splunk logs: {}", response.unwrap_err())
+            successfull = successfull.saturating_add(1);
         }
     }
     Ok((all, successfull))

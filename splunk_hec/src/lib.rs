@@ -13,6 +13,7 @@ pub struct SplunkConfig {
 }
 
 impl SplunkConfig {
+    #[must_use]
     pub fn new(index: String, yeet_server: url::Url, server: url::Url, token: String) -> Self {
         Self {
             index,
@@ -79,12 +80,14 @@ pub enum SplunkMessageType {
     },
 }
 impl SplunkMessageType {
+    #[must_use]
     pub fn sourcetype(&self) -> String {
         match self {
             SplunkMessageType::QueryJob { .. } => "osquery_query_log".to_owned(),
             SplunkMessageType::QueryRow { .. } => "osquery_response".to_owned(),
         }
     }
+    #[must_use]
     pub fn query(sid: SearchID, nodes: Vec<String>, user: String, query: String) -> Self {
         Self::QueryJob {
             event: QueryMetadata {
@@ -95,6 +98,7 @@ impl SplunkMessageType {
             },
         }
     }
+    #[must_use]
     pub fn response(
         sid: SearchID,
         hostname: String,
@@ -118,7 +122,7 @@ pub struct RowMetadata {
     sid: SearchID,
     /// osqueryd `host_identifier`
     hostname: String,
-    /// "SQLite" (osquery) Status of the response. If it is non 0 `response` will be empty
+    /// "`SQLite`" (osquery) Status of the response. If it is non 0 `response` will be empty
     status: i64,
 }
 

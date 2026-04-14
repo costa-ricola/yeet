@@ -48,7 +48,7 @@ async fn main() {
 
     let splunk = 'splunk: {
         let Ok(server) = env::var("YEET_SPLUNK_URL").map(|url| url.parse().unwrap()) else {
-            println!("`YEET_SPLUNK_URL` not set. Not using splunk");
+            log::error!("`YEET_SPLUNK_URL` not set. Not using splunk");
             break 'splunk None;
         };
 

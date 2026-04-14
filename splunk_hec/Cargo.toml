@@ -1,5 +1,6 @@
 [package]
 name = "splunk_hec"
+description = "Splunk bindings for osquery data"
 version.workspace = true
 categories.workspace = true
 edition.workspace = true

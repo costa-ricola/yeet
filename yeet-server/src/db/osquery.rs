@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use jiff_sqlx::ToSqlx;
+use jiff_sqlx::ToSqlx as _;
 use sqlx::{Acquire as _, types::Json};
 use uuid::Uuid;
 

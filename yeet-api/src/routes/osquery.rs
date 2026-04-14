@@ -23,6 +23,7 @@ impl PartialEq for Node {
 }
 impl Eq for Node {}
 
+#[expect(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Node {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.host_identifier.partial_cmp(&other.host_identifier)

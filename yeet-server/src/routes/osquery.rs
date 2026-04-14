@@ -137,7 +137,7 @@ fn query_write_failure() -> osquery_tls::DistributedWriteResponse {
 pub(crate) fn row_to_column(rows: Vec<IndexMap<String, String>>) -> IndexMap<String, Vec<String>> {
     let mut columns: IndexMap<String, Vec<String>> = IndexMap::new();
 
-    for row in rows.into_iter() {
+    for row in rows {
         for (column_name, value) in row {
             columns.entry(column_name).or_default().push(value);
         }
@@ -146,15 +146,15 @@ pub(crate) fn row_to_column(rows: Vec<IndexMap<String, String>>) -> IndexMap<Str
 }
 
 pub(crate) fn column_to_row(
-    columns: IndexMap<String, Vec<String>>,
+    columns: &IndexMap<String, Vec<String>>,
 ) -> Vec<IndexMap<String, String>> {
     let mut rows: Vec<IndexMap<String, String>> = Vec::new();
 
-    let max_rows = columns.values().map(|v| v.len()).max().unwrap_or(0);
+    let max_rows = columns.values().map(std::vec::Vec::len).max().unwrap_or(0);
 
     for row_idx in 0..max_rows {
         let mut row: IndexMap<String, String> = IndexMap::new();
-        for (column_name, values) in &columns {
+        for (column_name, values) in columns {
             if let Some(value) = values.get(row_idx) {
                 row.insert(column_name.clone(), value.clone());
             }
@@ -167,8 +167,9 @@ pub(crate) fn column_to_row(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indexmap::indexmap;
+
+    use super::*;
 
     #[test]
     fn table_conversion() {
@@ -178,7 +179,7 @@ mod tests {
         ];
 
         let columns = row_to_column(rows.clone());
-        let rows_converted = column_to_row(columns);
+        let rows_converted = column_to_row(&columns);
         assert_eq!(rows, rows_converted);
     }
 }
