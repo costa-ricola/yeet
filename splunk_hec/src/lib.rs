@@ -46,8 +46,7 @@ impl SplunkConfig {
             .json(&events)
             .header("Authorization", format!("Splunk {}", self.token))
             .send()
-            .await?
-            .error_for_status()
+            .await
     }
 }
 

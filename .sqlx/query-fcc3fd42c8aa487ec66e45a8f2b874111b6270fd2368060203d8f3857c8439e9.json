@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE osquery_dq_queries\n                    SET splunk_status = $1\n                    WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "fcc3fd42c8aa487ec66e45a8f2b874111b6270fd2368060203d8f3857c8439e9"
+}

@@ -131,22 +131,28 @@ async fn send_responses(
             .send_msgs(query_rows, node_response.response_time.to_jiff())
             .await;
 
-        // only update that it was sent if it was sent successfull
-        if let Err(err) = response {
-            log::error!("Failed to send splunk logs: {err}");
-        } else {
-            sqlx::query!(
-                r#"UPDATE osquery_dq_responses
-                SET splunk_status = $1
-                WHERE id = $2"#,
-                SplunkStatus::Sent,
-                node_response.id
-            )
-            .execute(&mut *conn)
-            .await?;
-            successfull = successfull.saturating_add(1);
+        match response {
+            // only update that it was sent if it was sent successfull
+            Ok(response) if response.status().is_success() => {
+                sqlx::query!(
+                    r#"UPDATE osquery_dq_responses
+                    SET splunk_status = $1
+                    WHERE id = $2"#,
+                    SplunkStatus::Sent,
+                    node_response.id
+                )
+                .execute(&mut *conn)
+                .await?;
+                successfull = successfull.saturating_add(1);
+            }
+            Ok(response) => log::error!(
+                "Splunk responded with a non success:\n{:#?}",
+                response.text().await
+            ),
+            Err(err) => log::error!("Failed to send splunk logs: {err}"),
         }
     }
+
     Ok((all, successfull))
 }
 
@@ -193,20 +199,25 @@ async fn send_queries(
             )
             .await;
 
-        // only update that it was sent if it was sent successfull
-        if let Err(err) = response {
-            log::error!("Failed to send splunk logs: {err}");
-        } else {
-            sqlx::query!(
-                r#"UPDATE osquery_dq_queries
-                SET splunk_status = $1
-                WHERE id = $2"#,
-                SplunkStatus::Sent,
-                query.id
-            )
-            .execute(&mut *conn)
-            .await?;
-            successfull = successfull.saturating_add(1);
+        match response {
+            // only update that it was sent if it was sent successfull
+            Ok(response) if response.status().is_success() => {
+                sqlx::query!(
+                    r#"UPDATE osquery_dq_queries
+                    SET splunk_status = $1
+                    WHERE id = $2"#,
+                    SplunkStatus::Sent,
+                    query.id
+                )
+                .execute(&mut *conn)
+                .await?;
+                successfull = successfull.saturating_add(1);
+            }
+            Ok(response) => log::error!(
+                "Splunk responded with a non success:\n{:#?}",
+                response.text().await
+            ),
+            Err(err) => log::error!("Failed to send splunk logs: {err}"),
         }
     }
     Ok((all, successfull))
