@@ -26,12 +26,11 @@ pub async fn show_nodes(config: &Config) -> Result<(), Report> {
 pub async fn query(config: &Config, sql: String) -> Result<(), Report> {
     let url = common::get_server_url(config).await?;
     let key = &ssh::key_by_url(&url)?;
+    let mut nodes = api::list_nodes(&url, key).await?;
+    nodes.sort();
 
-    let nodes = inquire::MultiSelect::new(
-        "Which nodes should execute this query?",
-        api::list_nodes(&url, key).await?,
-    )
-    .prompt()?;
+    let nodes =
+        inquire::MultiSelect::new("Which nodes should execute this query?", nodes).prompt()?;
 
     let nodes = nodes.into_iter().map(|node| node.id).collect();
 

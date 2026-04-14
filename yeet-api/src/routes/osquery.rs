@@ -16,6 +16,24 @@ pub struct Node {
     pub host_details: osquery_tls::EnrollmentHostDetails,
 }
 
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.host_identifier == other.host_identifier
+    }
+}
+impl Eq for Node {}
+
+impl PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.host_identifier.partial_cmp(&other.host_identifier)
+    }
+}
+impl Ord for Node {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.host_identifier.cmp(&other.host_identifier)
+    }
+}
+
 impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // TODO: include more info
