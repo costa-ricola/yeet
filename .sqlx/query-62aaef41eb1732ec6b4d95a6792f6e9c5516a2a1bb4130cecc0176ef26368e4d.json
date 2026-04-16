@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            id,\n            host_identifier,\n            platform_name,\n            osquery_version,\n            os_version,\n            cpu_arch,\n            platform,\n            hardware_serial\n        FROM osquery_nodes",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "host_identifier",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "platform_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "osquery_version",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "os_version",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "cpu_arch",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "platform",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "hardware_serial",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "62aaef41eb1732ec6b4d95a6792f6e9c5516a2a1bb4130cecc0176ef26368e4d"
+}

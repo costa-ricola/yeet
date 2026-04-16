@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 use jiff_sqlx::ToSqlx as _;
 use osquery_tls::LogType;
-use sqlx::{Acquire as _, types::Json};
+use sqlx::Acquire as _;
 use uuid::Uuid;
 
 error_set::error_set! {
@@ -18,16 +18,31 @@ error_set::error_set! {
 }
 
 pub async fn list_nodes(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::Node>, sqlx::Error> {
-    let nodes = sqlx::query!(r#"
-        SELECT id, host_identifier, host_details as "host_details: Json<osquery_tls::EnrollmentHostDetails>"
-        FROM osquery_nodes"#)
-        .map(|row| api::Node {
-            id: api::NodeID::new(row.id),
-            host_identifier: row.host_identifier,
-            host_details: row.host_details.0,
-        })
-        .fetch_all(&mut *conn)
-        .await?;
+    let nodes = sqlx::query!(
+        r#"
+        SELECT
+            id,
+            host_identifier,
+            platform_name,
+            osquery_version,
+            os_version,
+            cpu_arch,
+            platform,
+            hardware_serial
+        FROM osquery_nodes"#
+    )
+    .map(|row| api::Node {
+        id: api::NodeID::new(row.id),
+        host_identifier: row.host_identifier,
+        platform_name: row.platform_name,
+        osquery_version: row.osquery_version,
+        os_version: row.os_version,
+        cpu_arch: row.cpu_arch,
+        platform: row.platform,
+        hardware_serial: row.hardware_serial,
+    })
+    .fetch_all(&mut *conn)
+    .await?;
 
     Ok(nodes)
 }
@@ -108,15 +123,13 @@ pub async fn enroll_node<I: age::Identity>(
     }
 
     let node_key = uuid::Uuid::now_v7();
-    let details = Json::from(enroll_request.host_details);
 
     sqlx::query!(
-        r#"INSERT INTO osquery_nodes (node_key, host_identifier, platform_type, host_details)
-           VALUES ($1,$2,$3,$4)"#,
+        r#"INSERT INTO osquery_nodes (node_key, host_identifier, platform_type)
+           VALUES ($1,$2,$3)"#,
         node_key,
         enroll_request.host_identifier,
         enroll_request.platform_type,
-        details
     )
     .execute(conn)
     .await?;
@@ -257,6 +270,12 @@ async fn store_result_log(
 
     // TODO: sqlx in operator
     for result in results {
+        // this is an internal pack - we do not send this to splunk
+        if result.name == "pack_yeet_internal_node_info" {
+            update_node_info(&mut *conn, node, result).await?;
+            continue;
+        }
+
         let log = serde_json::to_string(&result.action).expect("Could not serialize a json");
         let now = jiff::Timestamp::now().to_sqlx();
         sqlx::query!(
@@ -276,6 +295,78 @@ async fn store_result_log(
         .execute(&mut *conn)
         .await?;
     }
+
+    Ok(())
+}
+
+async fn update_node_info(
+    conn: &mut sqlx::SqliteConnection,
+    node: &uuid::Uuid,
+    result: &osquery_tls::ResultLog,
+) -> Result<(), sqlx::Error> {
+    let osquery_tls::EventLogAction::Snapshot { snapshot } = &result.action else {
+        log::error!(
+            "yeet_node_info is not of type snapshot:\n{:#?}",
+            result.action
+        );
+        return Ok(());
+    };
+    let Some(info) = snapshot.last() else {
+        log::error!("yeet_node_info snapshot was empty",);
+        return Ok(());
+    };
+
+    let Some(platform_name) = info.get("name") else {
+        log::error!("yeet_node_info did not contain platform_name",);
+        return Ok(());
+    };
+
+    let Some(os_version) = info.get("os_version") else {
+        log::error!("yeet_node_info did not contain os_version",);
+        return Ok(());
+    };
+
+    let Some(cpu_arch) = info.get("arch") else {
+        log::error!("yeet_node_info did not contain cpu_arch",);
+        return Ok(());
+    };
+
+    let Some(platform) = info.get("platform") else {
+        log::error!("yeet_node_info did not contain platform",);
+        return Ok(());
+    };
+
+    let Some(hardware_serial) = info.get("hardware_serial") else {
+        log::error!("yeet_node_info did not contain hardware_serial",);
+        return Ok(());
+    };
+
+    let Some(osquery_version) = info.get("version") else {
+        log::error!("yeet_node_info did not contain osquery_version",);
+        return Ok(());
+    };
+
+    sqlx::query!(
+        r#"
+        UPDATE osquery_nodes
+        SET platform_name = $1,
+            osquery_version = $2,
+            os_version = $3,
+            cpu_arch = $4,
+            platform = $5,
+            hardware_serial = $6
+        WHERE node_key = $7
+        "#,
+        platform_name,
+        osquery_version,
+        os_version,
+        cpu_arch,
+        platform,
+        hardware_serial,
+        node
+    )
+    .execute(conn)
+    .await?;
 
     Ok(())
 }

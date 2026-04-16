@@ -12,8 +12,12 @@ crate::db_id!(QueryID);
 pub struct Node {
     pub id: NodeID,
     pub host_identifier: String,
-    // pub platform_type: String,
-    pub host_details: osquery_tls::EnrollmentHostDetails,
+    pub platform_name: String,
+    pub osquery_version: String,
+    pub os_version: String,
+    pub cpu_arch: String,
+    pub platform: String,
+    pub hardware_serial: String,
 }
 
 impl PartialEq for Node {

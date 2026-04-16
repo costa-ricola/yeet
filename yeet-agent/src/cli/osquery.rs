@@ -1,9 +1,10 @@
+use colored::Colorize as _;
 use rootcause::Report;
 
 use crate::{
     cli::common,
     cli_args::Config,
-    section::{self, DisplaySection as _},
+    section::{self, DisplaySectionItem},
     sig::ssh,
 };
 
@@ -15,10 +16,11 @@ pub async fn show_nodes(config: &Config) -> Result<(), Report> {
 
     let nodes_section = nodes
         .into_iter()
-        .map(|n| n.as_section())
+        .map(|n| n.as_section_item())
         .collect::<Vec<_>>();
 
-    section::print_sections(&nodes_section);
+    let section = vec![("Nodes:".underline().to_string(), nodes_section)];
+    section::print_sections(&section);
     Ok(())
 }
 

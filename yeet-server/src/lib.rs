@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    env,
     fs::File,
     io::{self},
     net::SocketAddr,
@@ -242,6 +243,22 @@ fn get_osquery_packs(path: PathBuf) -> Result<IndexMap<String, serde_json::Value
 
         packs.insert(file_name, pack);
     }
+
+    let interval = env::var("YEET_INTERNAL_PACK_INTERVAL").unwrap_or("86400".to_owned());
+
+    let yeet_nodes_information = serde_json::json!({
+          "queries": {
+            "node_info": {
+              "query" : "SELECT os_version.name, os_version.version as os_version, os_version.arch, os_version.platform, system_info.computer_name, system_info.hardware_serial, osquery_info.version FROM osquery_info,os_version,system_info;",
+              "interval" : interval,
+              "snapshot": true,
+              "description" : "Internal pack from yeet to gather information about nodes"
+            }
+          }
+        }
+    );
+
+    packs.insert("yeet_internal".to_owned(), yeet_nodes_information);
 
     Ok(packs)
 }
