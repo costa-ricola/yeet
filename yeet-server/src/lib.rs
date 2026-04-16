@@ -231,7 +231,16 @@ fn get_osquery_packs(path: PathBuf) -> Result<IndexMap<String, serde_json::Value
             );
             continue;
         };
-        packs.insert(path.file_name().to_string_lossy().to_string(), pack);
+
+        let file_name = path
+            .file_name()
+            .to_string_lossy()
+            .split('.')
+            .next()
+            .map(|str| str.to_owned())
+            .unwrap_or("unnamedPack".to_owned());
+
+        packs.insert(file_name, pack);
     }
 
     Ok(packs)
