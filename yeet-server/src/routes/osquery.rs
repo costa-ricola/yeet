@@ -1,7 +1,9 @@
-use std::{collections::HashMap, os};
+use std::collections::HashMap;
 
 use axum::{Json, extract::State, http::StatusCode};
 use indexmap::IndexMap;
+
+use uuid::Uuid;
 
 use crate::{
     YeetState, db,
@@ -71,12 +73,8 @@ pub async fn query_read(
     let Ok(mut conn) = state.pool.acquire().await else {
         return Json(query_read_failure());
     };
-    let node_key = {
-        let node_key = request.node_key.and_then(|key| key.parse().ok());
-        let Some(node_key) = node_key else {
-            return Json(query_read_failure());
-        };
-        node_key
+    let Some(node_key) = get_node_key(request.node_key) else {
+        return Json(query_read_failure());
     };
 
     let Ok(response) = db::osquery::dqueries_for_node(&mut conn, &node_key).await else {
@@ -99,12 +97,8 @@ pub async fn query_write(
     let Ok(mut conn) = state.pool.acquire().await else {
         return Json(osquery_tls::EmptyResponse::invalid());
     };
-    let node_key = {
-        let node_key = request.node_key.and_then(|key| key.parse().ok());
-        let Some(node_key) = node_key else {
-            return Json(osquery_tls::EmptyResponse::invalid());
-        };
-        node_key
+    let Some(node_key) = get_node_key(request.node_key) else {
+        return Json(osquery_tls::EmptyResponse::invalid());
     };
 
     // transform from row to column based
@@ -128,12 +122,32 @@ pub async fn query_write(
 
 pub async fn config(
     State(state): State<YeetState>,
-    Json(request): Json<serde_json::Value>,
+    Json(request): Json<osquery_tls::NodeKey>,
 ) -> Json<serde_json::Value> {
-    log::info!(
-        "Received config request:\n{}",
-        serde_json::to_string_pretty(&request).unwrap()
+    let empty_response = Json(
+        serde_json::to_value(osquery_tls::EmptyResponse::invalid())
+            .expect("EmptyResponse can be serialized"),
     );
+
+    let Ok(mut conn) = state.pool.acquire().await else {
+        return empty_response;
+    };
+
+    let Some(node_key) = get_node_key(request.node_key) else {
+        return empty_response;
+    };
+
+    // we are a bit special here because we only check if it is a valid node
+    let Ok(_node_id) = sqlx::query_scalar!(
+        r#"SELECT id FROM osquery_nodes WHERE node_key = $1"#,
+        node_key
+    )
+    .fetch_one(&mut *conn)
+    .await
+    else {
+        return empty_response;
+    };
+
     Json(serde_json::json!({
         "packs": state.osquery_packs
     }))
@@ -167,6 +181,14 @@ pub(crate) fn row_to_column(rows: Vec<IndexMap<String, String>>) -> IndexMap<Str
         }
     }
     columns
+}
+
+fn get_node_key(key: Option<String>) -> Option<Uuid> {
+    let node_key = key.and_then(|key| key.parse().ok());
+    let Some(node_key) = node_key else {
+        return None;
+    };
+    Some(node_key)
 }
 
 pub(crate) fn column_to_row(
