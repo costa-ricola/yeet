@@ -106,7 +106,7 @@ pub struct StatusLog {
     /// e.g. 2 (maybe an u16)
     pub severity: i32,
     /// e.g. 1775122921
-    pub unix_time: u64,
+    pub unix_time: i64,
     /// e.g. 5.21.0
     pub version: String,
 }
@@ -118,14 +118,14 @@ pub struct ResultLog {
     pub calendar_time: String,
     #[serde(flatten)]
     pub action: EventLogAction,
-    pub counter: u64,
+    pub counter: i64,
     pub epoch: i64,
     pub host_identifier: String,
     /// pack name e.g. "pack_<pack_id>_<pack_name>"
     pub name: String,
     /// This is an indicator for all results, true if osquery attempted to log numerics as numbers, otherwise false indicates they were logged as strings.
     pub numerics: bool,
-    pub unix_time: u64,
+    pub unix_time: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]

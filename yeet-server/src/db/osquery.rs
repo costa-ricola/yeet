@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use indexmap::IndexMap;
 use jiff_sqlx::ToSqlx as _;
+use osquery_tls::LogType;
 use sqlx::{Acquire as _, types::Json};
 use uuid::Uuid;
 
@@ -156,19 +157,13 @@ pub async fn dqueries_for_node(
     })
 }
 
-error_set::error_set! {
-    DWriteError := {
-        SQLXE(sqlx::Error),
-    }
-}
-
 /// Store the result of a query (from the node)
 pub async fn write_dquery_response(
     conn: &mut sqlx::SqliteConnection,
     node: &uuid::Uuid,
     queries: &HashMap<String, IndexMap<String, Vec<String>>>,
     statuses: &HashMap<String, u32>,
-) -> Result<osquery_tls::EmptyResponse, DWriteError> {
+) -> Result<osquery_tls::EmptyResponse, sqlx::Error> {
     let mut tx = conn.begin().await?;
 
     let node_id = sqlx::query_scalar!(r#"SELECT id FROM osquery_nodes WHERE node_key = $1"#, node)
@@ -204,6 +199,85 @@ pub async fn write_dquery_response(
 
     tx.commit().await?;
     Ok(osquery_tls::EmptyResponse::valid())
+}
+
+pub async fn store_remote_log(
+    conn: &mut sqlx::SqliteConnection,
+    node: &uuid::Uuid,
+    log: &osquery_tls::LogType,
+) -> Result<(), sqlx::Error> {
+    match log {
+        LogType::Result(result_logs) => store_result_log(conn, node, result_logs).await,
+        LogType::Status(status_logs) => store_status_log(conn, node, status_logs).await,
+    }
+}
+
+async fn store_status_log(
+    conn: &mut sqlx::SqliteConnection,
+    node: &uuid::Uuid,
+    statuses: &Vec<osquery_tls::StatusLog>,
+) -> Result<(), sqlx::Error> {
+    let node_id = sqlx::query_scalar!(r#"SELECT id FROM osquery_nodes WHERE node_key = $1"#, node)
+        .fetch_one(&mut *conn)
+        .await?;
+
+    // TODO: sqlx in operator
+    for status in statuses {
+        let now = jiff::Timestamp::now().to_sqlx();
+        sqlx::query!(
+            r#"INSERT INTO osquery_status_log
+                (node_id, splunk_status, calendar_time, received_time, unix_time, filename, line, message, severity, version)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"#,
+            node_id,
+            crate::splunk_sender::SplunkStatus::NotSent,
+            status.calendar_time,
+            now,
+            status.unix_time,
+            status.filename,
+            status.line,
+            status.message,
+            status.severity,
+            status.version
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn store_result_log(
+    conn: &mut sqlx::SqliteConnection,
+    node: &uuid::Uuid,
+    results: &Vec<osquery_tls::ResultLog>,
+) -> Result<(), sqlx::Error> {
+    let node_id = sqlx::query_scalar!(r#"SELECT id FROM osquery_nodes WHERE node_key = $1"#, node)
+        .fetch_one(&mut *conn)
+        .await?;
+
+    // TODO: sqlx in operator
+    for result in results {
+        let log = serde_json::to_string(&result.action).expect("Could not serialize a json");
+        let now = jiff::Timestamp::now().to_sqlx();
+        sqlx::query!(
+            r#"INSERT INTO osquery_result_log
+                (node_id, splunk_status, calendar_time, received_time, unix_time, numerics, epoch, pack_name, log)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)"#,
+            node_id,
+            crate::splunk_sender::SplunkStatus::NotSent,
+            result.calendar_time,
+            now,
+            result.unix_time,
+            result.numerics,
+            result.epoch,
+            result.name,
+            log
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

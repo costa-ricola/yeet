@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use axum::{Json, extract::State, http::StatusCode};
 use indexmap::IndexMap;
 
+use osquery_tls::EmptyResponse;
 use uuid::Uuid;
 
 use crate::{
@@ -157,15 +158,40 @@ pub async fn log(
     State(state): State<YeetState>,
     Json(request): Json<serde_json::Value>,
 ) -> Json<osquery_tls::EmptyResponse> {
-    log::info!(
-        "Received RemoteLog:\n{}",
-        serde_json::to_string_pretty(&request).unwrap()
-    );
-    let remote_log = serde_json::from_value::<osquery_tls::RemoteLoggingRequest>(request);
-    match remote_log {
-        Ok(_) => log::info!("Deserialized RemoteLogging without issues"),
-        Err(err) => log::error!("Could not deserialize remoteLog:\n{}", err),
+    let remote_log = serde_json::from_value::<osquery_tls::RemoteLoggingRequest>(request.clone());
+
+    let remote_log = match remote_log {
+        Ok(remote_log) => {
+            log::info!("Deserialized RemoteLogging without issues");
+            remote_log
+        }
+        Err(err) => {
+            log::error!(
+                "Could not deserialize RemoteLog:\n{}\nreceived:\n{}",
+                err,
+                serde_json::to_string_pretty(&request).unwrap()
+            );
+            return Json(EmptyResponse::invalid());
+        }
+    };
+
+    let Ok(mut conn) = state.pool.acquire().await else {
+        return Json(EmptyResponse::invalid());
+    };
+
+    let Some(node_key) = get_node_key(remote_log.node_key) else {
+        return Json(EmptyResponse::invalid());
+    };
+
+    if let Err(err) = db::osquery::store_remote_log(&mut conn, &node_key, &remote_log.data).await {
+        log::error!(
+            "Unable to store remote_log {err}:\n {}",
+            serde_json::to_string_pretty(&request).unwrap()
+        );
+        return Json(EmptyResponse::invalid());
     }
+
+    crate::wake_splunk(state.sender.as_ref()).await;
     Json(osquery_tls::EmptyResponse::valid())
 }
 
