@@ -41,8 +41,11 @@ impl Ord for Node {
 
 impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO: include more info
-        write!(f, "{}", self.host_identifier)
+        write!(f, "{}:", self.host_identifier)?;
+        write!(f, " {}", self.platform_name)?;
+        write!(f, " {}", self.os_version)?;
+        write!(f, " - {}", self.cpu_arch)?;
+        write!(f, " osquery_version: {}", self.osquery_version)
     }
 }
 

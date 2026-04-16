@@ -12,7 +12,11 @@ pub async fn show_nodes(config: &Config) -> Result<(), Report> {
     let url = common::get_server_url(config).await?;
     let key = &ssh::key_by_url(&url)?;
 
-    let nodes = api::list_nodes(&url, key).await?;
+    let nodes = {
+        let mut nodes = api::list_nodes(&url, key).await?;
+        nodes.sort();
+        nodes
+    };
 
     let nodes_section = nodes
         .into_iter()

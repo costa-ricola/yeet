@@ -53,10 +53,9 @@ impl DisplaySection for api::Host {
 impl DisplaySectionItem for api::Node {
     fn as_section_item(&self) -> (String, String) {
         let str = self.to_string();
-        // let (left, right) = str.split_once(':').unwrap();
+        let (left, right) = str.split_once(':').unwrap();
 
-        // (left.to_owned(), right.trim().to_owned())
-        (str, "".to_owned())
+        (left.to_owned(), right.trim().to_owned())
     }
 }
 
