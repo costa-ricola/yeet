@@ -124,6 +124,7 @@ pub struct ResultLogData {
     ///  one of removed, added, snapshot
     #[serde(flatten)]
     log: osquery_tls::EventLogAction,
+    pub counter: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -216,6 +217,7 @@ impl SplunkMessageType {
         epoch: i64,
         pack_name: String,
         log: osquery_tls::EventLogAction,
+        counter: i64,
     ) -> Self {
         Self::ResultLog {
             event: ResultLogData {
@@ -225,6 +227,7 @@ impl SplunkMessageType {
                 epoch,
                 pack_name,
                 log,
+                counter,
             },
         }
     }

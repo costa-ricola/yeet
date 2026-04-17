@@ -280,8 +280,8 @@ async fn store_result_log(
         let now = jiff::Timestamp::now().to_sqlx();
         sqlx::query!(
             r#"INSERT INTO osquery_result_log
-                (node_id, splunk_status, calendar_time, received_time, unix_time, numerics, epoch, pack_name, log)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)"#,
+                (node_id, splunk_status, calendar_time, received_time, unix_time, numerics, epoch, pack_name, log, counter)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"#,
             node_id,
             crate::splunk_sender::SplunkStatus::NotSent,
             result.calendar_time,
@@ -290,7 +290,8 @@ async fn store_result_log(
             result.numerics,
             result.epoch,
             result.name,
-            log
+            log,
+            result.counter
         )
         .execute(&mut *conn)
         .await?;

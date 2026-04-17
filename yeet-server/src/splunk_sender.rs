@@ -290,6 +290,7 @@ async fn send_results(
             orl.epoch,
             orl.pack_name,
             orl.log,
+            orl.counter,
             orl.received_time as "received_time: jiff_sqlx::Timestamp"
 
         FROM osquery_result_log orl
@@ -315,6 +316,7 @@ async fn send_results(
             result.epoch,
             result.pack_name,
             log,
+            result.counter,
         );
 
         let response = config

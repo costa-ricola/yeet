@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT\n            orl.id,\n            osn.host_identifier,\n            orl.unix_time,\n            orl.numerics as \"numerics: bool\",\n            orl.epoch,\n            orl.pack_name,\n            orl.log,\n            orl.received_time as \"received_time: jiff_sqlx::Timestamp\"\n\n        FROM osquery_result_log orl\n        JOIN osquery_nodes osn on orl.node_id = osn.id\n        WHERE orl.splunk_status = $1",
+  "query": "\n        SELECT\n            orl.id,\n            osn.host_identifier,\n            orl.unix_time,\n            orl.numerics as \"numerics: bool\",\n            orl.epoch,\n            orl.pack_name,\n            orl.log,\n            orl.counter,\n            orl.received_time as \"received_time: jiff_sqlx::Timestamp\"\n\n        FROM osquery_result_log orl\n        JOIN osquery_nodes osn on orl.node_id = osn.id\n        WHERE orl.splunk_status = $1",
   "describe": {
     "columns": [
       {
@@ -39,8 +39,13 @@
         "type_info": "Text"
       },
       {
-        "name": "received_time: jiff_sqlx::Timestamp",
+        "name": "counter",
         "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "received_time: jiff_sqlx::Timestamp",
+        "ordinal": 8,
         "type_info": "Text"
       }
     ],
@@ -55,8 +60,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "6f6922d3fc5091d5c84e2bf6ca3f47243a36eb063aef88fcfc196e5564c36da0"
+  "hash": "bb29446f5283f5b7f971a6c32401dbf04a1fcd83f036c1870df92bc6fe4dd9cb"
 }
