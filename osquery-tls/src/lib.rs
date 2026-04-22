@@ -67,11 +67,13 @@ pub struct EmptyResponse {
 }
 
 impl EmptyResponse {
+    #[must_use]
     pub fn valid() -> Self {
         Self {
             node_invalid: false,
         }
     }
+    #[must_use]
     pub fn invalid() -> Self {
         Self { node_invalid: true }
     }
@@ -97,7 +99,7 @@ pub enum LogType {
 pub struct StatusLog {
     /// e.g. "Fri Mar 27 15:42:13 2026 UTC"
     pub calendar_time: String,
-    /// e.g. tls_enroll.cpp
+    /// e.g. `tls_enroll.cpp`
     pub filename: String,
     pub host_identifier: String,
     pub line: u32,
@@ -121,7 +123,7 @@ pub struct ResultLog {
     pub counter: i64,
     pub epoch: i64,
     pub host_identifier: String,
-    /// pack name e.g. "pack_<pack_id>_<pack_name>"
+    /// pack name e.g. "pack_<`pack_id`>_<`pack_name`>"
     pub name: String,
     /// This is an indicator for all results, true if osquery attempted to log numerics as numbers, otherwise false indicates they were logged as strings.
     pub numerics: bool,

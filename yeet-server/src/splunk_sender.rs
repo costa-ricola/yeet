@@ -21,14 +21,14 @@ pub async fn run(
     while let Some(()) = receiver.recv().await {
         let mut conn = pool.acquire().await?;
 
-        let s_q = send_queries(&mut conn, &config).await?;
-        let s_r = send_responses(&mut conn, &config).await?;
-        let s_s = send_statuses(&mut conn, &config).await?;
-        let s_rs = send_results(&mut conn, &config).await?;
-        let d_r = delete_responses(&mut conn).await?;
-        let d_q = delete_queries(&mut conn).await?;
-        let d_s = delete_statuses(&mut conn).await?;
-        let d_rs = delete_results(&mut conn).await?;
+        let send_queries = send_queries(&mut conn, &config).await?;
+        let send_responses = send_responses(&mut conn, &config).await?;
+        let send_statuses = send_statuses(&mut conn, &config).await?;
+        let send_results = send_results(&mut conn, &config).await?;
+        let delte_responses = delete_responses(&mut conn).await?;
+        let delete_queries = delete_queries(&mut conn).await?;
+        let delete_statuses = delete_statuses(&mut conn).await?;
+        let delete_results = delete_results(&mut conn).await?;
 
         log::info!(
             "SPLUNK SYNC
@@ -36,22 +36,22 @@ pub async fn run(
     Sent Responses: {all_responses}/{ok_responses}(OK)/{err_respnses}(ERR)
      Sent Statuses: {all_status}/{ok_status}(OK)/{err_status}(ERR)
       Sent Results: {all_results}/{ok_results}(OK)/{err_results}(ERR)
-   Deleted Queries: {d_q}
- Deleted Responses: {d_r}
-  Deleted Statuses: {d_s}
-   Deleted Results: {d_rs}",
-            all_queries = s_q.0,
-            ok_queries = s_q.1,
-            err_queries = s_q.0.saturating_sub(s_q.1),
-            all_responses = s_r.0,
-            ok_responses = s_r.1,
-            err_respnses = s_r.0.saturating_sub(s_r.1),
-            all_status = s_s.0,
-            ok_status = s_s.1,
-            err_status = s_s.0.saturating_sub(s_s.1),
-            all_results = s_rs.0,
-            ok_results = s_rs.1,
-            err_results = s_rs.0.saturating_sub(s_rs.1),
+   Deleted Queries: {delete_queries}
+ Deleted Responses: {delte_responses}
+  Deleted Statuses: {delete_statuses}
+   Deleted Results: {delete_results}",
+            all_queries = send_queries.0,
+            ok_queries = send_queries.1,
+            err_queries = send_queries.0.saturating_sub(send_queries.1),
+            all_responses = send_responses.0,
+            ok_responses = send_responses.1,
+            err_respnses = send_responses.0.saturating_sub(send_responses.1),
+            all_status = send_statuses.0,
+            ok_status = send_statuses.1,
+            err_status = send_statuses.0.saturating_sub(send_statuses.1),
+            all_results = send_results.0,
+            ok_results = send_results.1,
+            err_results = send_results.0.saturating_sub(send_results.1),
         );
     }
     Ok(())

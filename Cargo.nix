@@ -9615,7 +9615,7 @@ rec {
       };
       "osquery-tls" = rec {
         crateName = "osquery-tls";
-        version = "0.1.0";
+        version = "0.2.0";
         edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./osquery-tls; };
         libName = "osquery_tls";
@@ -13770,7 +13770,7 @@ rec {
       };
       "splunk_hec" = rec {
         crateName = "splunk_hec";
-        version = "0.9.10";
+        version = "0.9.11";
         edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./splunk_hec; };
         dependencies = [
@@ -13787,6 +13787,10 @@ rec {
           {
             name = "log";
             packageId = "log";
+          }
+          {
+            name = "osquery-tls";
+            packageId = "osquery-tls";
           }
           {
             name = "reqwest";
@@ -21751,7 +21755,7 @@ rec {
       };
       "yeet" = rec {
         crateName = "yeet";
-        version = "0.9.10";
+        version = "0.9.11";
         edition = "2024";
         crateBin = [
           {
@@ -21919,7 +21923,7 @@ rec {
       };
       "yeet-api" = rec {
         crateName = "yeet-api";
-        version = "0.9.10";
+        version = "0.9.11";
         edition = "2024";
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./yeet-api; };
         libName = "yeet_api";
@@ -22026,7 +22030,7 @@ rec {
       };
       "yeetd" = rec {
         crateName = "yeetd";
-        version = "0.9.10";
+        version = "0.9.11";
         edition = "2024";
         crateBin = [
           {

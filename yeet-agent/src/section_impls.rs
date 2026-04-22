@@ -49,7 +49,7 @@ impl DisplaySection for api::Host {
     }
 }
 
-// TODO: config to extract wanted fields
+#[expect(clippy::unwrap_used)]
 impl DisplaySectionItem for api::Node {
     fn as_section_item(&self) -> (String, String) {
         let str = self.to_string();

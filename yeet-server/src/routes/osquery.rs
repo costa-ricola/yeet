@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use axum::{Json, extract::State, http::StatusCode};
 use indexmap::IndexMap;
-
 use osquery_tls::EmptyResponse;
 use uuid::Uuid;
 
@@ -167,7 +166,8 @@ pub async fn log(
             log::error!(
                 "Could not deserialize RemoteLog:\n{}\nreceived:\n{}",
                 err,
-                serde_json::to_string_pretty(&request).unwrap()
+                serde_json::to_string_pretty(&request)
+                    .unwrap_or("Could not serialize response".to_owned())
             );
             return Json(EmptyResponse::invalid());
         }
@@ -184,7 +184,8 @@ pub async fn log(
     if let Err(err) = db::osquery::store_remote_log(&mut conn, &node_key, &remote_log.data).await {
         log::error!(
             "Unable to store remote_log {err}:\n {}",
-            serde_json::to_string_pretty(&request).unwrap()
+            serde_json::to_string_pretty(&request)
+                .unwrap_or("Could not serialize response".to_owned())
         );
         return Json(EmptyResponse::invalid());
     }

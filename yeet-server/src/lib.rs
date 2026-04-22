@@ -4,7 +4,7 @@ use std::{
     fs::File,
     io::{self},
     net::SocketAddr,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
@@ -104,7 +104,7 @@ pub async fn launch<I: Into<std::net::IpAddr>>(
         None
     };
     let osquery_packs = osquery_packs
-        .map(|path| get_osquery_packs(path).expect("Could not retrive packs"))
+        .map(|path| get_osquery_packs(&path).expect("Could not retrive packs"))
         .unwrap_or_default();
 
     let state = YeetState {
@@ -212,7 +212,8 @@ pub(crate) async fn wake_splunk(sender: Option<&tokio::sync::mpsc::Sender<()>>) 
 }
 
 /// Read all files in a directory to json
-fn get_osquery_packs(path: PathBuf) -> Result<IndexMap<String, serde_json::Value>, io::Error> {
+#[expect(clippy::indexing_slicing)]
+fn get_osquery_packs(path: &Path) -> Result<IndexMap<String, serde_json::Value>, io::Error> {
     let mut packs = IndexMap::new();
     for path in path.read_dir()? {
         let path = path?;
@@ -231,17 +232,16 @@ fn get_osquery_packs(path: PathBuf) -> Result<IndexMap<String, serde_json::Value
             .to_string_lossy()
             .split('.')
             .next()
-            .map(|str| str.to_owned())
-            .unwrap_or("unnamedPack".to_owned());
+            .map_or("unnamedPack".to_owned(), std::borrow::ToOwned::to_owned);
 
-        log::info!("Loaded pack {}:", file_name);
+        log::info!("Loaded pack {file_name}:");
         log::info!("Queries:");
         if let Some(queries) = pack["queries"].as_object() {
             for query in queries.keys() {
-                log::info!("- {query}")
+                log::info!("- {query}");
             }
         } else {
-            log::warn!("Pack {} had no queries", file_name);
+            log::warn!("Pack {file_name} had no queries");
         }
         log::debug!("Pack content:\n{:?}", serde_json::to_string_pretty(&pack));
         packs.insert(file_name, pack);

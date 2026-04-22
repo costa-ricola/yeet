@@ -93,7 +93,7 @@ pub enum SplunkMessageType {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StatusLogData {
-    /// host_identifier
+    /// `host_identifier`
     hostname: String,
     ///  unix timestamp when the log was sent. TODO: windows?
     unix_time: i64,
@@ -111,7 +111,7 @@ pub struct StatusLogData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ResultLogData {
-    /// host_identifier
+    /// `host_identifier`
     hostname: String,
     ///  unix timestamp when the log was sent. TODO: windows?
     unix_time: i64,
@@ -124,7 +124,7 @@ pub struct ResultLogData {
     ///  one of removed, added, snapshot
     #[serde(flatten)]
     log: osquery_tls::EventLogAction,
-    pub counter: i64,
+    counter: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

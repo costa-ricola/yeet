@@ -4,7 +4,7 @@ use rootcause::Report;
 use crate::{
     cli::common,
     cli_args::Config,
-    section::{self, DisplaySectionItem},
+    section::{self, DisplaySectionItem as _},
     sig::ssh,
 };
 
