@@ -34,8 +34,11 @@ pub async fn query(config: &Config, sql: String) -> Result<(), Report> {
     let mut nodes = api::list_nodes(&url, key).await?;
     nodes.sort();
 
-    let nodes =
-        inquire::MultiSelect::new("Which nodes should execute this query?", nodes).prompt()?;
+    let nodes = inquire::MultiSelect::new("Which nodes should execute this query?", nodes)
+        .with_validator(
+            inquire::validator::MinLengthValidator::new(1).with_message("Select at least one node"),
+        )
+        .prompt()?;
 
     let nodes = nodes.into_iter().map(|node| node.id).collect();
 
