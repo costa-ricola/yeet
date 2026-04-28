@@ -47,12 +47,24 @@ pub async fn list_nodes(conn: &mut sqlx::SqliteConnection) -> Result<Vec<api::No
     Ok(nodes)
 }
 
+error_set::error_set! {
+    CreateQueryError := {
+        #[display("Nodes can't be empty")]
+        EmptyNodes,
+        SQLXE(sqlx::Error),
+    }
+}
+
 pub async fn create_query(
     conn: &mut sqlx::SqliteConnection,
     user: api::UserID,
     query: String,
     filter: Vec<api::NodeID>,
-) -> Result<api::QueryID, sqlx::Error> {
+) -> Result<api::QueryID, CreateQueryError> {
+    if filter.is_empty() {
+        return Err(CreateQueryError::EmptyNodes);
+    }
+
     let mut tx = conn.begin().await?;
 
     let now = jiff::Timestamp::now().to_sqlx();
@@ -68,7 +80,6 @@ pub async fn create_query(
     .last_insert_rowid();
 
     // TODO: no loop
-    // TODO: what if no nodes
 
     let mut nodes = sqlx::query_scalar!(r#"SELECT id as "id: api::NodeID" FROM osquery_nodes"#)
         .fetch_all(&mut *tx)
