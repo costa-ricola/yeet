@@ -313,37 +313,37 @@ async fn update_node_info(
         return Ok(());
     };
     let Some(info) = snapshot.last() else {
-        log::error!("yeet_node_info snapshot was empty",);
+        log::error!("yeet_node_info snapshot was empty");
         return Ok(());
     };
 
     let Some(platform_name) = info.get("name") else {
-        log::error!("yeet_node_info did not contain platform_name",);
+        log::error!("yeet_node_info did not contain platform_name");
         return Ok(());
     };
 
     let Some(os_version) = info.get("os_version") else {
-        log::error!("yeet_node_info did not contain os_version",);
+        log::error!("yeet_node_info did not contain os_version");
         return Ok(());
     };
 
     let Some(cpu_arch) = info.get("arch") else {
-        log::error!("yeet_node_info did not contain cpu_arch",);
+        log::error!("yeet_node_info did not contain cpu_arch");
         return Ok(());
     };
 
     let Some(platform) = info.get("platform") else {
-        log::error!("yeet_node_info did not contain platform",);
+        log::error!("yeet_node_info did not contain platform");
         return Ok(());
     };
 
     let Some(hardware_serial) = info.get("hardware_serial") else {
-        log::error!("yeet_node_info did not contain hardware_serial",);
+        log::error!("yeet_node_info did not contain hardware_serial");
         return Ok(());
     };
 
     let Some(osquery_version) = info.get("version") else {
-        log::error!("yeet_node_info did not contain osquery_version",);
+        log::error!("yeet_node_info did not contain osquery_version");
         return Ok(());
     };
 
