@@ -23,7 +23,6 @@ in
     sqlite-interactive
     pkgs-unstable.cargo-tarpaulin
   ];
-  env.RUSTFLAGS = "--cfg tokio_unstable";
   env.DATABASE_URL = "sqlite:yeet.db";
   env.YEET_CERT = "cert.pem";
   env.YEET_CERT_KEY = "key.pem";

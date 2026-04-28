@@ -5,7 +5,6 @@ on:
 
 env:
   DATABASE_URL: sqlite:yeet.db
-  RUSTFLAGS: --cfg tokio_unstable
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
