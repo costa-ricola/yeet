@@ -83,13 +83,81 @@ pub enum SplunkMessageType {
         event: IndexMap<String, String>,
         fields: RowMetadata,
     },
+    StatusLog {
+        event: StatusLogData,
+    },
+    ResultLog {
+        event: ResultLogData,
+    },
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StatusLogData {
+    /// `host_identifier`
+    hostname: String,
+    ///  unix timestamp when the log was sent. TODO: windows?
+    unix_time: i64,
+    /// file where the error came from
+    filename: String,
+    /// line where on the file the error occured
+    line: u32,
+    /// log message
+    message: String,
+    /// severity of the log
+    severity: i32,
+    /// osquery version
+    version: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResultLogData {
+    /// `host_identifier`
+    hostname: String,
+    ///  unix timestamp when the log was sent. TODO: windows?
+    unix_time: i64,
+    ///  This is an indicator for all results, true if osquery attempted to log numerics as numbers, otherwise false indicates they were logged as strings: bool.
+    numerics: bool,
+    ///  used with event format. if the epoch changes the node will send the full table agai: n
+    epoch: i64,
+    ///  which pack the log originated from
+    pack_name: String,
+    ///  one of removed, added, snapshot
+    #[serde(flatten)]
+    log: osquery_tls::EventLogAction,
+    counter: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RowMetadata {
+    /// Corresponding `QueryJob`
+    sid: SearchID,
+    /// osqueryd `host_identifier`
+    hostname: String,
+    /// "`SQLite`" (osquery) Status of the response. If it is non 0 `response` will be empty
+    status: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryMetadata {
+    sid: SearchID,
+    /// List of target nodes (osqueryd `host_identifier`)
+    /// If hostnames are not unique or consistent in your environment, you can launch osqueryd with `--host_identifier=uuid`
+    nodes: Vec<String>,
+    /// Yeet user that created the query
+    user: String,
+    /// actual query that is sent to the nodes
+    query: String, // Yeet version
+                   // version: String,
+}
+
 impl SplunkMessageType {
     #[must_use]
     pub fn sourcetype(&self) -> String {
         match self {
             SplunkMessageType::QueryJob { .. } => "osquery_query_log".to_owned(),
             SplunkMessageType::QueryRow { .. } => "osquery_response".to_owned(),
+            SplunkMessageType::StatusLog { .. } => "osquery_status_log".to_owned(),
+            SplunkMessageType::ResultLog { .. } => "osquery_result".to_owned(),
         }
     }
     #[must_use]
@@ -119,27 +187,48 @@ impl SplunkMessageType {
             },
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RowMetadata {
-    /// Corresponding `QueryJob`
-    sid: SearchID,
-    /// osqueryd `host_identifier`
-    hostname: String,
-    /// "`SQLite`" (osquery) Status of the response. If it is non 0 `response` will be empty
-    status: i64,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryMetadata {
-    sid: SearchID,
-    /// List of target nodes (osqueryd `host_identifier`)
-    /// If hostnames are not unique or consistent in your environment, you can launch osqueryd with `--host_identifier=uuid`
-    nodes: Vec<String>,
-    /// Yeet user that created the query
-    user: String,
-    /// actual query that is sent to the nodes
-    query: String, // Yeet version
-                   // version: String,
+    #[must_use]
+    pub fn status(
+        hostname: String,
+        unix_time: i64,
+        filename: String,
+        line: u32,
+        message: String,
+        severity: i32,
+        version: String,
+    ) -> Self {
+        Self::StatusLog {
+            event: StatusLogData {
+                hostname,
+                unix_time,
+                filename,
+                line,
+                message,
+                severity,
+                version,
+            },
+        }
+    }
+    #[must_use]
+    pub fn result(
+        hostname: String,
+        unix_time: i64,
+        numerics: bool,
+        epoch: i64,
+        pack_name: String,
+        log: osquery_tls::EventLogAction,
+        counter: i64,
+    ) -> Self {
+        Self::ResultLog {
+            event: ResultLogData {
+                hostname,
+                unix_time,
+                numerics,
+                epoch,
+                pack_name,
+                log,
+                counter,
+            },
+        }
+    }
 }

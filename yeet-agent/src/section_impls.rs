@@ -49,21 +49,13 @@ impl DisplaySection for api::Host {
     }
 }
 
-// TODO: config to extract wanted fields
-impl DisplaySection for api::Node {
-    fn as_section(&self) -> crate::section::Section {
-        let details = {
-            let mut details = self.host_details.os_version.iter().collect::<Vec<_>>();
-            details.extend(self.host_details.osquery_info.iter());
-            details.extend(self.host_details.platform_info.iter());
-            details.extend(self.host_details.system_info.iter());
-            details
-                .into_iter()
-                .map(|detail| (detail.0.clone(), detail.1.clone()))
-                .collect()
-        };
+#[expect(clippy::unwrap_used)]
+impl DisplaySectionItem for api::Node {
+    fn as_section_item(&self) -> (String, String) {
+        let str = self.to_string();
+        let (left, right) = str.split_once(':').unwrap();
 
-        (self.host_identifier.underline().to_string(), details)
+        (left.to_owned(), right.trim().to_owned())
     }
 }
 

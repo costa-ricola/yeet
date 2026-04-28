@@ -12,8 +12,12 @@ crate::db_id!(QueryID);
 pub struct Node {
     pub id: NodeID,
     pub host_identifier: String,
-    // pub platform_type: String,
-    pub host_details: osquery_tls::EnrollmentHostDetails,
+    pub platform_name: String,
+    pub osquery_version: String,
+    pub os_version: String,
+    pub cpu_arch: String,
+    pub platform: String,
+    pub hardware_serial: String,
 }
 
 impl PartialEq for Node {
@@ -37,8 +41,11 @@ impl Ord for Node {
 
 impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO: include more info
-        write!(f, "{}", self.host_identifier)
+        write!(f, "{}:", self.host_identifier)?;
+        write!(f, " {}", self.platform_name)?;
+        write!(f, " {}", self.os_version)?;
+        write!(f, " - {}", self.cpu_arch)?;
+        write!(f, " osquery_version: {}", self.osquery_version)
     }
 }
 

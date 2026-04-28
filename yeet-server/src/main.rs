@@ -4,6 +4,7 @@ use std::{
     env,
     fs::{File, read_to_string},
     io::Write as _,
+    path::Path,
     str::FromStr as _,
 };
 
@@ -18,6 +19,14 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
     reason = "allow in server main"
 )]
 async fn main() {
+    let _tracer = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .or_else(|_| tracing_subscriber::EnvFilter::try_new("yeetd=error,tower_http=warn"))
+                .expect("Could not init tracing logger"),
+        )
+        .try_init();
+
     let port = env::var("YEET_PORT")
         .map(|port| port.parse().unwrap())
         .unwrap_or(4337);
@@ -65,6 +74,11 @@ async fn main() {
         ))
     };
 
+    let packs = {
+        let env = env::var("YEET_OSQUERY_PACKS").ok();
+        env.map(|env| Path::new(&env).to_path_buf())
+    };
+
     let options = SqliteConnectOptions::new()
         .filename("yeet.db")
         .create_if_missing(true);
@@ -74,6 +88,6 @@ async fn main() {
         .await
         .expect("Can't connect to yeet.db");
 
-    let handle = yeetd::launch(port, host, pool, age_key, Some(tls), splunk).await;
+    let handle = yeetd::launch(port, host, pool, age_key, Some(tls), splunk, packs).await;
     handle.await.expect("axum quit");
 }

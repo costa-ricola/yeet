@@ -1,4 +1,13 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    env,
+    fs::File,
+    io::{self},
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use axum::routing::{delete, get, post, put};
 
@@ -27,6 +36,7 @@ mod splunk_sender;
 
 use axum_server::tls_rustls::RustlsConfig;
 use ed25519_dalek::VerifyingKey;
+use indexmap::IndexMap;
 pub(crate) use routes::{host, key, secret, system, verify};
 
 #[derive(Clone)]
@@ -34,6 +44,7 @@ struct YeetState {
     pub pool: sqlx::SqlitePool,
     pub age_key: Arc<age::x25519::Identity>,
     pub sender: Option<tokio::sync::mpsc::Sender<()>>,
+    pub osquery_packs: IndexMap<String, serde_json::Value>,
 }
 
 use serde::{Deserialize, Serialize};
@@ -56,6 +67,7 @@ pub async fn launch<I: Into<std::net::IpAddr>>(
     age_key: age::x25519::Identity,
     tls: Option<RustlsConfig>,
     splunk: Option<splunk_hec::SplunkConfig>,
+    osquery_packs: Option<PathBuf>,
 ) -> tokio::task::JoinHandle<()> {
     #[expect(clippy::unwrap_used)]
     {
@@ -91,11 +103,15 @@ pub async fn launch<I: Into<std::net::IpAddr>>(
     } else {
         None
     };
+    let osquery_packs = osquery_packs
+        .map(|path| get_osquery_packs(&path).expect("Could not retrive packs"))
+        .unwrap_or_default();
 
     let state = YeetState {
         pool,
         age_key,
         sender,
+        osquery_packs,
     };
 
     // wake the splunk sender immediately so that he can send all logs
@@ -117,14 +133,6 @@ pub async fn launch<I: Into<std::net::IpAddr>>(
 }
 
 fn routes(state: YeetState) -> axum::Router {
-    let _tracer = tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .or_else(|_| tracing_subscriber::EnvFilter::try_new("yeetd=error,tower_http=warn"))
-                .expect("Could not init tracing logger"),
-        )
-        .try_init();
-
     axum::Router::new()
         // Public
         .route("/verification/add", post(verify::add_verification_attempt))
@@ -187,14 +195,11 @@ fn routes(state: YeetState) -> axum::Router {
         .route("/osquery/enroll", post(osquery::enroll))
         .route("/osquery/query/read", post(osquery::query_read))
         .route("/osquery/query/write", post(osquery::query_write))
+        .route("/osquery/config", post(osquery::config))
+        .route("/osquery/log", post(osquery::log))
         // === Osquery
         .route("/osquery/nodes", get(osquery::list_nodes))
         .route("/osquery/query/create", post(osquery::create_query))
-        // query status
-        // .route(
-        // "/osquery/query/response/{query_id}/{node_id}",
-        // get(osquery::query_write),
-        // )
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -204,6 +209,65 @@ pub(crate) async fn wake_splunk(sender: Option<&tokio::sync::mpsc::Sender<()>>) 
         // TODO: log if we could not notify
         let _ignore = sender.send_timeout((), Duration::from_secs(1)).await;
     }
+}
+
+/// Read all files in a directory to json
+#[expect(clippy::indexing_slicing)]
+fn get_osquery_packs(path: &Path) -> Result<IndexMap<String, serde_json::Value>, io::Error> {
+    let mut packs = IndexMap::new();
+    for path in path.read_dir()? {
+        let path = path?;
+        log::info!("Scanning {} for packs", path.file_name().display());
+        let Ok(pack) = serde_json::from_reader::<_, serde_json::Value>(File::open(path.path())?)
+        else {
+            log::warn!(
+                "Pack `{}` not ingested - not valid json",
+                path.path().display()
+            );
+            continue;
+        };
+
+        let file_name = path
+            .file_name()
+            .to_string_lossy()
+            .split('.')
+            .next()
+            .map_or("unnamedPack".to_owned(), std::borrow::ToOwned::to_owned);
+
+        log::info!("Loaded pack {file_name}:");
+        log::info!("Queries:");
+        if let Some(queries) = pack["queries"].as_object() {
+            for query in queries.keys() {
+                log::info!("- {query}");
+            }
+        } else {
+            log::warn!("Pack {file_name} had no queries");
+        }
+        log::debug!("Pack content:\n{:?}", serde_json::to_string_pretty(&pack));
+        packs.insert(file_name, pack);
+    }
+
+    if packs.is_empty() {
+        log::warn!("Could not find any packs in {}", path.display());
+    }
+
+    let interval = env::var("YEET_INTERNAL_PACK_INTERVAL").unwrap_or("86400".to_owned());
+
+    let yeet_nodes_information = serde_json::json!({
+          "queries": {
+            "node_info": {
+              "query" : "SELECT os_version.name, os_version.version as os_version, os_version.arch, os_version.platform, system_info.computer_name, system_info.hardware_serial, osquery_info.version FROM osquery_info,os_version,system_info;",
+              "interval" : interval,
+              "snapshot": true,
+              "description" : "Internal pack from yeet to gather information about nodes"
+            }
+          }
+        }
+    );
+
+    packs.insert("yeet_internal".to_owned(), yeet_nodes_information);
+
+    Ok(packs)
 }
 
 #[cfg(test)]

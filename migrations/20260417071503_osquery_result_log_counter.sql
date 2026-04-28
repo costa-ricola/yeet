@@ -1,0 +1,1 @@
+ALTER TABLE osquery_result_log ADD COLUMN counter    INTEGER NOT NULL DEFAULT 0;

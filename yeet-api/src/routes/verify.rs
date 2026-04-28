@@ -23,5 +23,5 @@ request! (
 
 request! (
     is_host_verified(),
-    get("/system/verify") -> StatusCode
+    get("/verification/check") -> StatusCode
 );

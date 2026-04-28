@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE osquery_nodes\n        SET platform_name = $1,\n            osquery_version = $2,\n            os_version = $3,\n            cpu_arch = $4,\n            platform = $5,\n            hardware_serial = $6\n        WHERE node_key = $7\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "65818968f87d299e3155da9d7574572b39555366880170aa62c5fdaa275bb482"
+}

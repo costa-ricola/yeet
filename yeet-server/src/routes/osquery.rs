@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use axum::{Json, extract::State, http::StatusCode};
 use indexmap::IndexMap;
+use osquery_tls::EmptyResponse;
+use uuid::Uuid;
 
 use crate::{
     YeetState, db,
@@ -66,17 +68,13 @@ fn enroll_failure() -> osquery_tls::EnrollmentResponse {
 
 pub async fn query_read(
     State(state): State<YeetState>,
-    Json(request): Json<osquery_tls::DistributedReadRequest>,
+    Json(request): Json<osquery_tls::NodeKey>,
 ) -> Json<osquery_tls::DistributedReadResponse> {
     let Ok(mut conn) = state.pool.acquire().await else {
         return Json(query_read_failure());
     };
-    let node_key = {
-        let node_key = request.node_key.and_then(|key| key.parse().ok());
-        let Some(node_key) = node_key else {
-            return Json(query_read_failure());
-        };
-        node_key
+    let Some(node_key) = get_node_key(request.node_key) else {
+        return Json(query_read_failure());
     };
 
     let Ok(response) = db::osquery::dqueries_for_node(&mut conn, &node_key).await else {
@@ -95,16 +93,12 @@ fn query_read_failure() -> osquery_tls::DistributedReadResponse {
 pub async fn query_write(
     State(state): State<YeetState>,
     Json(request): Json<osquery_tls::DistributedWriteRequest>,
-) -> Json<osquery_tls::DistributedWriteResponse> {
+) -> Json<osquery_tls::EmptyResponse> {
     let Ok(mut conn) = state.pool.acquire().await else {
-        return Json(query_write_failure());
+        return Json(osquery_tls::EmptyResponse::invalid());
     };
-    let node_key = {
-        let node_key = request.node_key.and_then(|key| key.parse().ok());
-        let Some(node_key) = node_key else {
-            return Json(query_write_failure());
-        };
-        node_key
+    let Some(node_key) = get_node_key(request.node_key) else {
+        return Json(osquery_tls::EmptyResponse::invalid());
     };
 
     // transform from row to column based
@@ -119,18 +113,87 @@ pub async fn query_write(
     let Ok(response) =
         db::osquery::write_dquery_response(&mut conn, &node_key, &queries, &request.statuses).await
     else {
-        return Json(query_write_failure());
+        return Json(osquery_tls::EmptyResponse::invalid());
     };
 
     crate::wake_splunk(state.sender.as_ref()).await;
     Json(response)
 }
 
-fn query_write_failure() -> osquery_tls::DistributedWriteResponse {
-    osquery_tls::DistributedWriteResponse {
-        node_invalid: Some(true),
-    }
+pub async fn config(
+    State(state): State<YeetState>,
+    Json(request): Json<osquery_tls::NodeKey>,
+) -> Json<serde_json::Value> {
+    let empty_response = Json(
+        serde_json::to_value(osquery_tls::EmptyResponse::invalid())
+            .expect("EmptyResponse can be serialized"),
+    );
+
+    let Ok(mut conn) = state.pool.acquire().await else {
+        return empty_response;
+    };
+
+    let Some(node_key) = get_node_key(request.node_key) else {
+        return empty_response;
+    };
+
+    // we are a bit special here because we only check if it is a valid node
+    let Ok(_node_id) = sqlx::query_scalar!(
+        r#"SELECT id FROM osquery_nodes WHERE node_key = $1"#,
+        node_key
+    )
+    .fetch_one(&mut *conn)
+    .await
+    else {
+        log::warn!("Unknown node: {node_key}");
+        return empty_response;
+    };
+
+    Json(serde_json::json!({
+        "packs": state.osquery_packs
+    }))
 }
+
+pub async fn log(
+    State(state): State<YeetState>,
+    Json(request): Json<serde_json::Value>,
+) -> Json<osquery_tls::EmptyResponse> {
+    let remote_log = serde_json::from_value::<osquery_tls::RemoteLoggingRequest>(request.clone());
+
+    let remote_log = match remote_log {
+        Ok(remote_log) => remote_log,
+        Err(err) => {
+            log::error!(
+                "Could not deserialize RemoteLog:\n{}\nreceived:\n{}",
+                err,
+                serde_json::to_string_pretty(&request)
+                    .unwrap_or("Could not serialize response".to_owned())
+            );
+            return Json(EmptyResponse::invalid());
+        }
+    };
+
+    let Ok(mut conn) = state.pool.acquire().await else {
+        return Json(EmptyResponse::invalid());
+    };
+
+    let Some(node_key) = get_node_key(remote_log.node_key) else {
+        return Json(EmptyResponse::invalid());
+    };
+
+    if let Err(err) = db::osquery::store_remote_log(&mut conn, &node_key, &remote_log.data).await {
+        log::error!(
+            "Unable to store remote_log {err}:\n {}",
+            serde_json::to_string_pretty(&request)
+                .unwrap_or("Could not serialize response".to_owned())
+        );
+        return Json(EmptyResponse::invalid());
+    }
+
+    crate::wake_splunk(state.sender.as_ref()).await;
+    Json(osquery_tls::EmptyResponse::valid())
+}
+
 // by row: `Vec<IndexMap<String, String>>` e.g. [{"clm1": "val1", "clm2":"val1"},{"clm1": "val2", "clm2":"val2"}]
 // by column: `IndexMap<String, Vec<String>>` e.g. {"clm1": ["val1","val2"],"clm2": ["val1","val2"]}
 
@@ -143,6 +206,15 @@ pub(crate) fn row_to_column(rows: Vec<IndexMap<String, String>>) -> IndexMap<Str
         }
     }
     columns
+}
+
+fn get_node_key(key: Option<String>) -> Option<Uuid> {
+    let node_key = key.and_then(|key| key.parse().ok());
+    let Some(node_key) = node_key else {
+        log::warn!("Did not send a node_key in a request that requires a node key");
+        return None;
+    };
+    Some(node_key)
 }
 
 pub(crate) fn column_to_row(
