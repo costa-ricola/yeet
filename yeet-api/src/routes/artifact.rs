@@ -21,7 +21,7 @@ request! (
     get("/artifact") -> Vec<Artifact>
 );
 
-pub async fn create_artifact<K: SigningKey + Sync>(
+pub async fn store_artifact<K: SigningKey + Sync>(
     url: &url::Url,
     key: &K,
     name: &str,

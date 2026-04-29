@@ -8,6 +8,7 @@ error_set::error_set! {
     }
 }
 
+// TODO: maybe do not store the artifact if it is the same contant as the last
 /// The artifact needs to be encrypted with the servers identity key
 /// retrieve it with GET `/secret/server_key`
 /// Add a new artifact - `store_key` required to test if it is an actual encrypted secret and not bogus
@@ -89,7 +90,7 @@ pub async fn get_latest<R: age::Recipient, I: age::Identity>(
     recipient: &R,
 ) -> Result<Option<Vec<u8>>, GetArtifactError> {
     let Some(artifact) = sqlx::query_scalar!(
-        r#"SELECT artifact FROM artifacts WHERE name = $1 AND host_id = $2"#,
+        r#"SELECT artifact FROM artifacts WHERE name = $1 AND host_id = $2 ORDER BY creation_time DESC LIMIT 1"#,
         artifact,
         host
     )
