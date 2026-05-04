@@ -62,10 +62,10 @@ async fn create(config: &Config) -> Result<(), Report> {
                 })
             })
             .prompt()?;
-        read_to_string(path)?.trim().as_bytes()
+        read_to_string(path)?
     };
 
-    api::create_secret(&url, secret_key, &name, &secret).await?;
+    api::create_secret(&url, secret_key, &name, secret.trim().as_bytes()).await?;
     log::info!("Secret {name} created!");
 
     allow(config).await?;

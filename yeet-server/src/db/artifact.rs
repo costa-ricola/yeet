@@ -57,6 +57,8 @@ pub async fn list(
             ON h.id = a_h.resource_id
             AND a_h.resource_type = $2
             AND a_h.user_id = $1
+
+        ORDER BY a.creation_time DESC
         "#,
         user,
         api::tag::ResourceType::Host

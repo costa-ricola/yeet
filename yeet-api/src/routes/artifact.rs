@@ -16,6 +16,15 @@ pub struct Artifact {
     pub creation_time: jiff::Timestamp,
 }
 
+impl std::fmt::Display for Artifact {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        write!(f, "({})", self.id)?;
+        write!(f, " - {}", self.host)?;
+        write!(f, " created at {}", self.creation_time)
+    }
+}
+
 request! (
     list_artifacts(),
     get("/artifact") -> Vec<Artifact>

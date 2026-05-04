@@ -1,0 +1,67 @@
+use clap::{Args, Subcommand};
+use colored::Colorize as _;
+
+use crate::{
+    cli::common,
+    cli_args::Config,
+    section::{self, DisplaySectionItem as _},
+    sig::ssh,
+};
+
+#[derive(Args)]
+pub struct ArtifactArgs {
+    #[command(subcommand)]
+    pub command: ArtifactCommands,
+}
+
+#[derive(Subcommand)]
+pub enum ArtifactCommands {
+    /// Show the content of an artifact
+    Show,
+}
+
+pub async fn handle_command(args: ArtifactArgs, config: &Config) -> Result<(), rootcause::Report> {
+    match args.command {
+        ArtifactCommands::Show => show(config).await,
+    }
+}
+#[expect(clippy::print_stdout)]
+async fn show(config: &Config) -> Result<(), rootcause::Report> {
+    let url = common::get_server_url(config).await?;
+    let secret_key = &ssh::key_by_url(&url)?;
+
+    let artifact = {
+        let mut artifacts = api::list_artifacts(&url, secret_key).await?;
+        artifacts.sort_by_key(|artifact| artifact.id);
+        inquire::Select::new("message", artifacts).prompt()?
+    };
+
+    let artifact_content = api::get_artifact_by_id(&url, secret_key, artifact.id).await?;
+    let artifact_content = String::from_utf8(artifact_content)?;
+
+    println!("{}:", artifact.to_string().bold().underline());
+    println!("{artifact_content}");
+    Ok(())
+}
+
+pub async fn artifacts(config: &Config) -> Result<(), rootcause::Report> {
+    let url = common::get_server_url(config).await?;
+    let secret_key = &ssh::key_by_url(&url)?;
+
+    let artifacts: Vec<(String, Vec<(String, String)>)> = {
+        let mut artifacts = api::list_artifacts(&url, secret_key).await?;
+        artifacts.sort_by_key(|artifact| artifact.id);
+
+        vec![(
+            "Artifacts:".underline().to_string(),
+            artifacts
+                .into_iter()
+                .map(|artifact| artifact.as_section_item())
+                .collect(),
+        )]
+    };
+
+    section::print_sections(&artifacts);
+
+    Ok(())
+}
