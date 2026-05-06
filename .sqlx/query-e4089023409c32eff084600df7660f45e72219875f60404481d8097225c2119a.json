@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT secret FROM secrets WHERE name = \"osquery-enroll\"",
+  "query": "SELECT secret FROM secrets WHERE name like \"osquery-enroll%\"",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "84f4c92b475934ac887b639fd9e5ad89c984dcb3b3bfff182f7816e3dda05e4c"
+  "hash": "e4089023409c32eff084600df7660f45e72219875f60404481d8097225c2119a"
 }
