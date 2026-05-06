@@ -108,19 +108,33 @@ pub async fn enroll_node<I: age::Identity>(
     store_key: &I,
     enroll_request: osquery_tls::EnrollmentRequest,
 ) -> Result<Uuid, EnrollError> {
-    // we hardcode the name of the enroll secret
-    let Some(enroll_secret) =
-        sqlx::query_scalar!(r#"SELECT secret FROM secrets WHERE name = "osquery-enroll""#)
-            .fetch_optional(&mut *conn)
-            .await?
-    else {
-        return Err(EnrollError::SecretNotSet);
+    let Some(enroll_secret) = enroll_request.enroll_secret else {
+        return Err(EnrollError::SecretMismatch);
     };
 
-    let enroll_secret = age::decrypt(store_key, &enroll_secret)?;
+    {
+        // all secrets that begin with `osquery-enroll` are tested
+        let enroll_secrets =
+            sqlx::query_scalar!(r#"SELECT secret FROM secrets WHERE name like "osquery-enroll%""#)
+                .fetch_all(&mut *conn)
+                .await?;
 
-    if Some(String::from_utf8_lossy(&enroll_secret).to_string()) != enroll_request.enroll_secret {
-        return Err(EnrollError::SecretMismatch);
+        if enroll_secrets.is_empty() {
+            return Err(EnrollError::SecretNotSet);
+        };
+
+        let mut secret_match = false;
+        for secret in enroll_secrets {
+            let server_secret = age::decrypt(store_key, &secret)?;
+            // if the secrets match we found our match and can continue
+            if String::from_utf8_lossy(&server_secret).to_string().trim() == enroll_secret.trim() {
+                secret_match = true;
+            }
+        }
+        // if we have not found a match we need to exit
+        if !secret_match {
+            return Err(EnrollError::SecretMismatch);
+        }
     }
 
     let existing_key = sqlx::query_scalar!(
@@ -407,6 +421,96 @@ mod test {
             &store_key,
             osquery_tls::EnrollmentRequest {
                 enroll_secret: Some("my-secret-enroll-secret".to_owned()),
+                host_identifier: "unique-host".into(),
+                host_details: osquery_tls::EnrollmentHostDetails {
+                    os_version: HashMap::new(),
+                    osquery_info: HashMap::new(),
+                    system_info: HashMap::new(),
+                    platform_info: HashMap::new(),
+                },
+                platform_type: "9".into(),
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[sqlx::test]
+    async fn enroll_new_node_multiple_secrets(pool: sqlx::SqlitePool) {
+        let mut conn = crate::sql_conn(pool).await;
+
+        let store_key = age::x25519::Identity::generate();
+
+        let encrypted = age::encrypt(&store_key.to_public(), b"my-secret-enroll-secret").unwrap();
+
+        let _enroll_secret =
+            db::secrets::add_secret(&mut conn, "osquery-enroll", encrypted, &store_key)
+                .await
+                .unwrap();
+
+        let encrypted =
+            age::encrypt(&store_key.to_public(), b"my-true-secret-enroll-secret").unwrap();
+
+        let _enroll_secret =
+            db::secrets::add_secret(&mut conn, "osquery-enroll-second", encrypted, &store_key)
+                .await
+                .unwrap();
+
+        db::osquery::enroll_node(
+            &mut conn,
+            &store_key,
+            osquery_tls::EnrollmentRequest {
+                enroll_secret: Some("my-true-secret-enroll-secret".to_owned()),
+                host_identifier: "unique-host".into(),
+                host_details: osquery_tls::EnrollmentHostDetails {
+                    os_version: HashMap::new(),
+                    osquery_info: HashMap::new(),
+                    system_info: HashMap::new(),
+                    platform_info: HashMap::new(),
+                },
+                platform_type: "9".into(),
+            },
+        )
+        .await
+        .unwrap();
+
+        let error = db::osquery::enroll_node(
+            &mut conn,
+            &store_key,
+            osquery_tls::EnrollmentRequest {
+                enroll_secret: Some("my-wrong-secret".to_owned()),
+                host_identifier: "unique-host2".into(),
+                host_details: osquery_tls::EnrollmentHostDetails {
+                    os_version: HashMap::new(),
+                    osquery_info: HashMap::new(),
+                    system_info: HashMap::new(),
+                    platform_info: HashMap::new(),
+                },
+                platform_type: "9".into(),
+            },
+        )
+        .await;
+        assert!(error.is_err())
+    }
+
+    #[sqlx::test]
+    async fn enroll_new_node_weird_formatting(pool: sqlx::SqlitePool) {
+        let mut conn = crate::sql_conn(pool).await;
+
+        let store_key = age::x25519::Identity::generate();
+
+        let encrypted = age::encrypt(&store_key.to_public(), b"my-secret-enroll-secret").unwrap();
+
+        let _enroll_secret =
+            db::secrets::add_secret(&mut conn, "osquery-enroll", encrypted, &store_key)
+                .await
+                .unwrap();
+
+        db::osquery::enroll_node(
+            &mut conn,
+            &store_key,
+            osquery_tls::EnrollmentRequest {
+                enroll_secret: Some("my-secret-enroll-secret\n".to_owned()),
                 host_identifier: "unique-host".into(),
                 host_details: osquery_tls::EnrollmentHostDetails {
                     os_version: HashMap::new(),
