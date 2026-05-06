@@ -22,7 +22,7 @@ async fn main() {
     let _tracer = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .or_else(|_| tracing_subscriber::EnvFilter::try_new("yeetd=error,tower_http=warn"))
+                .or_else(|_| tracing_subscriber::EnvFilter::try_new("yeetd=info,tower_http=warn"))
                 .expect("Could not init tracing logger"),
         )
         .try_init();
@@ -56,7 +56,7 @@ async fn main() {
 
     let splunk = 'splunk: {
         let Ok(server) = env::var("YEET_SPLUNK_URL").map(|url| url.parse().unwrap()) else {
-            log::error!("`YEET_SPLUNK_URL` not set. Not using splunk");
+            log::info!("`YEET_SPLUNK_URL` not set. Not using splunk");
             break 'splunk None;
         };
 
@@ -75,7 +75,7 @@ async fn main() {
 
     let defectdojo = 'defectdojo: {
         let Ok(server) = env::var("YEET_DEFECTDOJO_URL").map(|url| url.parse().unwrap()) else {
-            log::error!("`YEET_DEFECTDOJO_URL` not set. Not using defectdojo");
+            log::info!("`YEET_DEFECTDOJO_URL` not set. Not using defectdojo");
             break 'defectdojo None;
         };
         let token = env::var("YEET_DEFECTDOJO_TOKEN").expect("`YEET_DEFECTDOJO_TOKEN` must be set");

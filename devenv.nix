@@ -22,13 +22,7 @@ in
     bacon
     sqlite-interactive
     pkgs-unstable.cargo-tarpaulin
+    just
   ];
   env.DATABASE_URL = "sqlite:yeet.db";
-  env.YEET_CERT = "cert.pem";
-  env.YEET_CERT_KEY = "key.pem";
-  env.YEET_HOST = "0.0.0.0";
-  # env.YEET_URL = "https://example.com";
-  env.YEET_SPLUNK_URL = "http://localhost";
-  env.YEET_SPLUNK_INDEX = "my_index";
-  env.YEET_SPLUNK_TOKEN = "<>";
 }
