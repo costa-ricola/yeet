@@ -37,7 +37,7 @@ pub async fn create_secret<K: SigningKey + Sync>(
     secret: &[u8],
 ) -> Result<SecretName, ResponseError> {
     let recipient: age::x25519::Recipient = {
-        let recipient = server_age_key(&url, key).await?;
+        let recipient = server_age_key(url, key).await?;
 
         recipient
             .parse()

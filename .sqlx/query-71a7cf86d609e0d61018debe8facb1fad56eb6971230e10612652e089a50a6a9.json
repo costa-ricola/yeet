@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            a.id as \"id!: api::ArtifactID\",\n            a.name,\n            a.creation_time as \"creation_time: jiff_sqlx::Timestamp\",\n            h.id as \"host_id: api::HostID\"\n        FROM artifacts a\n\n        -- Join Hosts (Secret ACL)\n        LEFT JOIN hosts h ON a.host_id = h.id\n\n        -- Join View to find authorized Secrets\n        JOIN access a_h\n            ON h.id = a_h.resource_id\n            AND a_h.resource_type = $2\n            AND a_h.user_id = $1\n\n        ORDER BY a.creation_time DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: api::ArtifactID",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "creation_time: jiff_sqlx::Timestamp",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "host_id: api::HostID",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "71a7cf86d609e0d61018debe8facb1fad56eb6971230e10612652e089a50a6a9"
+}

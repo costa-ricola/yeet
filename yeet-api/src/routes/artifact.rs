@@ -37,7 +37,7 @@ pub async fn store_artifact<K: SigningKey + Sync>(
     artifact: &[u8],
 ) -> Result<StatusCode, ResponseError> {
     let recipient: age::x25519::Recipient = {
-        let recipient = server_age_key(&url, key).await?;
+        let recipient = server_age_key(url, key).await?;
 
         recipient
             .parse()
@@ -45,7 +45,7 @@ pub async fn store_artifact<K: SigningKey + Sync>(
     };
     let artifact = age::encrypt(&recipient, artifact)?;
 
-    Ok(reqwest::Client::new()
+    reqwest::Client::new()
         .post(url.join(&format!("/artifact/store/{name}"))?)
         .json(&artifact)
         .sign(&sig_param(key)?, key)
@@ -53,7 +53,7 @@ pub async fn store_artifact<K: SigningKey + Sync>(
         .send()
         .await?
         .error_for_code()
-        .await?)
+        .await
 }
 
 /// this should only ever be called as a `host`

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT artifact FROM artifacts WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "artifact",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "25360e8b45750bf5fc561acfb5a99e83cb5e29a9aa4e0ba929dd98ba41e71151"
+}
