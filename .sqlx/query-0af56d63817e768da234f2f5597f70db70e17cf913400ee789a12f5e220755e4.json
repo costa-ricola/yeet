@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT artifact FROM artifacts WHERE name = $1 AND host_id = $2 ORDER BY creation_time DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "artifact",
+        "ordinal": 0,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0af56d63817e768da234f2f5597f70db70e17cf913400ee789a12f5e220755e4"
+}

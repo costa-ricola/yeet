@@ -60,6 +60,16 @@ impl DisplaySectionItem for api::Node {
 }
 
 #[expect(clippy::unwrap_used)]
+impl DisplaySectionItem for api::Artifact {
+    fn as_section_item(&self) -> (String, String) {
+        let str = self.to_string();
+        let (left, right) = str.split_once('-').unwrap();
+
+        (left.to_owned(), right.trim().to_owned())
+    }
+}
+
+#[expect(clippy::unwrap_used)]
 impl DisplaySectionItem for api::User {
     fn as_section_item(&self) -> (String, String) {
         let str = self.to_string();

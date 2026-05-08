@@ -59,8 +59,7 @@ pub async fn add_verification_attempt(
     let row_id = sqlx::query!(
         r#"
         INSERT INTO verification_attempts (id, verifying_key, timestamp, nixos_facter)
-        VALUES ( $1, $2, $3, $4)
-        "#,
+        VALUES ( $1, $2, $3, $4)"#,
         id,
         key,
         now,
@@ -253,9 +252,8 @@ mod test_verification {
         let key = &[0; 32][..];
         sqlx::query!(
             r#"
-            INSERT INTO verification_attempts (id, verifying_key, timestamp,  nixos_facter)
-            VALUES ( $1, $2, $3, $4)
-            "#,
+            INSERT INTO verification_attempts (id, verifying_key, timestamp, nixos_facter)
+            VALUES ( $1, $2, $3, $4)"#,
             id,
             key,
             before,

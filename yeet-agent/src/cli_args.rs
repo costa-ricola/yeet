@@ -153,6 +153,9 @@ pub enum Commands {
     Tag(crate::cli::tag::TagArgs),
     /// These are the raw subcommands to execute functions on the server
     Server(ServerArgs),
+    /// List artifacts
+    Artifacts,
+    Artifact(crate::cli::artifact::ArtifactArgs),
 }
 
 #[derive(Args)]

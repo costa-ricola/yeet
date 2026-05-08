@@ -121,7 +121,7 @@ pub async fn enroll_node<I: age::Identity>(
 
         if enroll_secrets.is_empty() {
             return Err(EnrollError::SecretNotSet);
-        };
+        }
 
         let mut secret_match = false;
         for secret in enroll_secrets {

@@ -26,10 +26,10 @@ mod sig {
 }
 mod cli {
     pub mod approve;
+    pub mod artifact;
     pub mod common;
     pub mod detach;
     pub mod host;
-
     pub mod osquery;
     pub mod publish;
     pub mod secret;
@@ -95,6 +95,8 @@ async fn main() -> Result<(), Report> {
         .extract()?;
 
     let command = match args.command {
+        Commands::Artifact(args) => cli::artifact::handle_command(args, &config).await,
+        Commands::Artifacts => cli::artifact::artifacts(&config).await,
         Commands::Nodes => cli::osquery::show_nodes(&config).await,
         Commands::Query { query } => cli::osquery::query(&config, query).await,
         Commands::Secret(args) => cli::secret::handle_command(args, &config).await,
