@@ -108,7 +108,7 @@ pub async fn enroll_node<I: age::Identity>(
     store_key: &I,
     enroll_request: osquery_tls::EnrollmentRequest,
 ) -> Result<Uuid, EnrollError> {
-    let Some(enroll_secret) = enroll_request.enroll_secret else {
+    let Some(enroll_secret) = &enroll_request.enroll_secret else {
         return Err(EnrollError::SecretMismatch);
     };
 
@@ -120,6 +120,10 @@ pub async fn enroll_node<I: age::Identity>(
                 .await?;
 
         if enroll_secrets.is_empty() {
+            log::warn!(
+                "A Node tried to enroll with a empty node_key:\n{:#?}",
+                enroll_request
+            );
             return Err(EnrollError::SecretNotSet);
         }
 
@@ -133,6 +137,7 @@ pub async fn enroll_node<I: age::Identity>(
         }
         // if we have not found a match we need to exit
         if !secret_match {
+            log::warn!("No matching secrets found for node:\n{:#?}", enroll_request);
             return Err(EnrollError::SecretMismatch);
         }
     }
